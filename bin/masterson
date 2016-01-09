@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'masterson'
+require 'moister'
+require 'ostruct'
+
+module Masterson::Command
+  def self.image_command command, args
+    raise "#{command} requires image argument" if args.empty?
+    args.shift
+  end
+
+  def self.run args
+    config = nil
+
+    Moister::SubcommandOptionParser.new do |op|
+      op.banner = 'usage: masterson [global options] command [command options]'
+
+      op.for_all do |op|
+        op.on_tail '-h', '--help', 'show this help message' do
+          puts op
+          exit
+        end
+      end
+
+      op.on '-p', '--project dir', 'override path to project', 'project_dir'
+
+      op.subcommand 'build', 'build docker image from dockerfile'
+      op.subcommand 'create', 'create container from image'
+      op.subcommand 'delete', 'delete container corresponding to image'
+      op.subcommand 'delete-all', 'delete containers corresponding to all images'
+      op.subcommand 'run', 'run created container'
+      op.subcommand 'shell', 'run created container with shell hiding usual container output'
+      op.subcommand 'exec', 'execute a command in a running container'
+
+      parsed_cfg = op.parse(args).to_h
+
+      parsed_cfg.merge! parsed_cfg[:config]
+      parsed_cfg.delete :config
+      config = OpenStruct.new parsed_cfg
+    end
+
+    unless config.command
+      puts 'please supply a command, see --help'
+      exit 1
+    end
+
+    masterson = Masterson::CloudManager.new(project_dir: config.project_dir)
+
+    case config.command
+    when 'build'
+      image = image_command 'build', config.positionals
+      masterson.build image
+    when 'create'
+      image = image_command 'create', config.positionals
+      masterson.create image
+    when 'delete'
+      image = image_command 'delete', config.positionals
+      masterson.delete image
+    when 'delete-all'
+      masterson.delete_all
+    when 'run'
+      image = image_command 'run', config.positionals
+      masterson.run image
+    when 'shell'
+      image = image_command 'shell', config.positionals
+      masterson.shell image
+    when 'exec'
+      image = image_command 'exec', config.positionals
+      masterson.exec image
+    end
+  rescue RuntimeError => e
+    puts e.to_s
+  end
+end
+
+Masterson::Command::run ARGV
