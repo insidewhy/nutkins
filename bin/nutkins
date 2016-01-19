@@ -22,13 +22,13 @@ module Nutkins::Command
 
       op.on '-p', '--project dir', 'override path to project', 'project_dir'
 
-      op.subcommand 'build *paths', 'build docker image from dockerfile'
-      op.subcommand 'create *paths', 'create container from image'
-      op.subcommand 'delete *paths', 'delete container corresponding to image'
+      op.subcommand 'build *names', 'build docker image from dockerfile'
+      op.subcommand 'create *names', 'create container from image'
+      op.subcommand 'delete *names', 'delete container corresponding to image'
       op.subcommand 'delete-all', 'delete containers corresponding to all images'
-      op.subcommand 'run path', 'run created container'
-      op.subcommand 'shell path', 'run created container with shell hiding usual container output'
-      op.subcommand 'exec path *cmd', 'execute a command in a running container'
+      op.subcommand 'run name', 'run created container'
+      op.subcommand 'shell name', 'run created container with shell hiding usual container output'
+      op.subcommand 'exec name *cmd', 'execute a command in a running container'
 
       parsed_cfg = op.parse(args).to_h
 
@@ -46,19 +46,19 @@ module Nutkins::Command
 
     case command
     when 'build'
-      nutkins.build cmd_config.paths
+      cmd_config.names.each &nutkins.method(:build)
     when 'create'
-      nutkins.create cmd_config.paths
+      cmd_config.names.each &nutkins.method(:create)
     when 'delete'
-      nutkins.delete cmd_config.paths
+      cmd_config.names.each &nutkins.method(:delete)
     when 'delete-all'
       nutkins.delete_all
     when 'run'
-      nutkins.run cmd_config.path
+      nutkins.run cmd_config.name
     when 'shell'
-      nutkins.shell cmd_config.path
+      nutkins.shell cmd_config.name
     when 'exec'
-      nutkins.exec cmd_config.path, cmd_config.cmd
+      nutkins.exec cmd_config.name, cmd_config.cmd
     end
   rescue RuntimeError => e
     puts e.to_s
