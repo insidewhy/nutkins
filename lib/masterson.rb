@@ -8,32 +8,32 @@ module Masterson
       puts "TODO: initialize project at #{@project_root}"
     end
 
-    def build image
-      puts "TODO: build #{image}"
+    def build paths
+      puts "TODO: build #{paths}"
     end
 
-    def create image
-      puts "TODO: create #{image}"
+    def create paths
+      puts "TODO: create #{paths}"
     end
 
-    def delete image
-      puts "TODO: delete #{image}"
+    def delete paths
+      puts "TODO: delete #{paths}"
     end
 
     def delete_all
       puts "TODO: delete_all"
     end
 
-    def run image
-      puts "TODO: run #{image}"
+    def run path
+      puts "TODO: run #{path}"
     end
 
-    def shell image
-      puts "TODO: shell #{image}"
+    def shell path
+      puts "TODO: shell #{path}"
     end
 
-    def exec image
-      puts "TODO: exec #{image}"
+    def exec path, *cmd
+      puts "TODO: exec #{path}: #{cmd.join ' '}"
     end
   end
 end

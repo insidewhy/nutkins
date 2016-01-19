@@ -6,13 +6,9 @@ require 'moister'
 require 'ostruct'
 
 module Masterson::Command
-  def self.image_command command, args
-    raise "#{command} requires image argument" if args.empty?
-    args.shift
-  end
-
   def self.run args
     config = nil
+    command = nil
 
     Moister::SubcommandOptionParser.new do |op|
       op.banner = 'usage: masterson [global options] command [command options]'
@@ -26,49 +22,43 @@ module Masterson::Command
 
       op.on '-p', '--project dir', 'override path to project', 'project_dir'
 
-      op.subcommand 'build', 'build docker image from dockerfile'
-      op.subcommand 'create', 'create container from image'
-      op.subcommand 'delete', 'delete container corresponding to image'
+      op.subcommand 'build *paths', 'build docker image from dockerfile'
+      op.subcommand 'create *paths', 'create container from image'
+      op.subcommand 'delete *paths', 'delete container corresponding to image'
       op.subcommand 'delete-all', 'delete containers corresponding to all images'
-      op.subcommand 'run', 'run created container'
-      op.subcommand 'shell', 'run created container with shell hiding usual container output'
-      op.subcommand 'exec', 'execute a command in a running container'
+      op.subcommand 'run path', 'run created container'
+      op.subcommand 'shell path', 'run created container with shell hiding usual container output'
+      op.subcommand 'exec path *cmd', 'execute a command in a running container'
 
       parsed_cfg = op.parse(args).to_h
 
-      parsed_cfg.merge! parsed_cfg[:config]
-      parsed_cfg.delete :config
-      config = OpenStruct.new parsed_cfg
+      config = OpenStruct.new parsed_cfg[:config]
+      command = parsed_cfg[:command]
     end
 
-    unless config.command
+    unless command
       puts 'please supply a command, see --help'
       exit 1
     end
 
     masterson = Masterson::CloudManager.new(project_dir: config.project_dir)
+    cmd_config = OpenStruct.new config[command]
 
-    case config.command
+    case command
     when 'build'
-      image = image_command 'build', config.positionals
-      masterson.build image
+      masterson.build cmd_config.paths
     when 'create'
-      image = image_command 'create', config.positionals
-      masterson.create image
+      masterson.create cmd_config.paths
     when 'delete'
-      image = image_command 'delete', config.positionals
-      masterson.delete image
+      masterson.delete cmd_config.paths
     when 'delete-all'
       masterson.delete_all
     when 'run'
-      image = image_command 'run', config.positionals
-      masterson.run image
+      masterson.run cmd_config.path
     when 'shell'
-      image = image_command 'shell', config.positionals
-      masterson.shell image
+      masterson.shell cmd_config.path
     when 'exec'
-      image = image_command 'exec', config.positionals
-      masterson.exec image
+      masterson.exec cmd_config.path, cmd_config.cmd
     end
   rescue RuntimeError => e
     puts e.to_s
