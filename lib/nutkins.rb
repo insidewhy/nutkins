@@ -30,6 +30,30 @@ module Nutkins
     raise "could not download #{orig_url}"
   end
 
+  def self.download_resources img_dir, resources
+    resources.each do |resource|
+      source = resource["source"]
+      dest = File.join(img_dir, resource["dest"])
+      unless File.exists? dest
+        FileUtils.mkdir_p File.dirname(dest)
+        print "downloading #{source}"
+        Nutkins.download_file source, dest
+        puts " - done"
+        mode = resource["mode"]
+        File.chmod(mode, dest) if mode
+      end
+    end
+  end
+
+  module Docker
+    def self.image_id_for_tag tag
+      regex = /^#{tag} +/
+      `docker images`.each_line do |line|
+        return line.split(' ')[2] if line =~ regex
+      end
+    end
+  end
+
   class CloudManager
     def initialize(project_dir: nil)
       @project_root = project_dir || Dir.pwd
@@ -43,27 +67,27 @@ module Nutkins
     def build img_name
       cfg = get_image_config img_name
       img_dir = get_image_dir img_name
+      raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
 
-      build = cfg["build"]
-      if build
-        resources = build["resources"]
-        if resources
-          resources.each do |resource|
-            source = resource["source"]
-            dest = File.join(img_dir, resource["dest"])
-            unless File.exists? dest
-              FileUtils.mkdir_p File.dirname(dest)
-              print "downloading #{source}"
-              Nutkins.download_file source, dest
-              puts " - done"
-              mode = resource["mode"]
-              File.chmod(mode, dest) if mode
-            end
-          end
-        end
+      build_cfg = cfg["build"]
+      if build_cfg
+        # download each of the files in the resources section if it doesn't exist
+        resources = build_cfg["resources"]
+        Nutkins.download_resources img_dir, resources if resources
       end
 
-      puts "TODO: build #{img_name}"
+      tag = @repository + '/' + img_name
+      prev_image_id = Docker.image_id_for_tag tag
+
+      if system "docker", "build", "-t", tag, img_dir
+        image_id = Docker.image_id_for_tag tag
+        if image_id != prev_image_id
+          puts "deleting previous image #{prev_image_id}"
+          system "docker", "rmi", prev_image_id
+        end
+      else
+        raise "issue building docker image for #{img_name}"
+      end
     end
 
     def create img_name
