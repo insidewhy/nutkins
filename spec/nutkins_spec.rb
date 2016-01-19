@@ -1,8 +1,8 @@
 require 'spec_helper'
 
-describe Masterson do
+describe Nutkins do
   it 'has a version number' do
-    expect(Masterson::VERSION).not_to be nil
+    expect(Nutkins::VERSION).not_to be nil
   end
 
   it 'does something useful' do

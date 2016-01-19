@@ -1,6 +1,6 @@
-# Masterson
+# Nutkins
 
-Masterson is a tool to manage and test a CoreOS cluster:
+Nutkins is a tool to manage and test a CoreOS cluster:
  * Config for each service is stored in a directory including an optional `config.yaml` and a `Dockerfile`.
  * Easy to create and run test instances of any service in a single command.
  * Docker images and containers are managed to avoid the difficulties using the raw `docker` command provides around removing images.

@@ -1,17 +1,17 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'masterson/version'
+require 'nutkins/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "masterson"
-  spec.version       = Masterson::VERSION
+  spec.name          = "nutkins"
+  spec.version       = Nutkins::VERSION
   spec.authors       = ["James Pike"]
   spec.email         = ["github@chilon.net"]
 
   spec.summary       = %q{CoreOS cluster management tool.}
   spec.description   = spec.summary
-  spec.homepage      = "http://github.com/ohjames/masterson"
+  spec.homepage      = "http://github.com/ohjames/nutkins"
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.

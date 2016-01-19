@@ -1,3 +1,3 @@
-module Masterson
+module Nutkins
   VERSION = "0.1.0"
 end

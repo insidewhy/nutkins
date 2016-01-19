@@ -1,17 +1,17 @@
 #!/usr/bin/env ruby
 
 require 'bundler/setup'
-require 'masterson'
+require 'nutkins'
 require 'moister'
 require 'ostruct'
 
-module Masterson::Command
+module Nutkins::Command
   def self.run args
     config = nil
     command = nil
 
     Moister::SubcommandOptionParser.new do |op|
-      op.banner = 'usage: masterson [global options] command [command options]'
+      op.banner = 'usage: nutkins [global options] command [command options]'
 
       op.for_all do |op|
         op.on_tail '-h', '--help', 'show this help message' do
@@ -41,28 +41,28 @@ module Masterson::Command
       exit 1
     end
 
-    masterson = Masterson::CloudManager.new(project_dir: config.project_dir)
+    nutkins = Nutkins::CloudManager.new(project_dir: config.project_dir)
     cmd_config = OpenStruct.new config[command]
 
     case command
     when 'build'
-      masterson.build cmd_config.paths
+      nutkins.build cmd_config.paths
     when 'create'
-      masterson.create cmd_config.paths
+      nutkins.create cmd_config.paths
     when 'delete'
-      masterson.delete cmd_config.paths
+      nutkins.delete cmd_config.paths
     when 'delete-all'
-      masterson.delete_all
+      nutkins.delete_all
     when 'run'
-      masterson.run cmd_config.path
+      nutkins.run cmd_config.path
     when 'shell'
-      masterson.shell cmd_config.path
+      nutkins.shell cmd_config.path
     when 'exec'
-      masterson.exec cmd_config.path, cmd_config.cmd
+      nutkins.exec cmd_config.path, cmd_config.cmd
     end
   rescue RuntimeError => e
     puts e.to_s
   end
 end
 
-Masterson::Command::run ARGV
+Nutkins::Command::run ARGV

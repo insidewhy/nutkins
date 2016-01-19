@@ -1,4 +1,4 @@
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in masterson.gemspec
+# Specify your gem's dependencies in nutkins.gemspec
 gemspec

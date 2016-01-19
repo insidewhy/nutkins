@@ -1,10 +1,10 @@
-require "masterson/version"
+require "nutkins/version"
 
-module Masterson
+module Nutkins
   class CloudManager
     def initialize(project_dir: nil)
       @project_root = project_dir || Dir.pwd
-      # TODO: scan upwards until masterson.yaml is found
+      # TODO: scan upwards until nutkins.yaml is found
       puts "TODO: initialize project at #{@project_root}"
     end
 
