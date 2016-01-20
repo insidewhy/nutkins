@@ -10,6 +10,7 @@ require "nutkins/version"
 module Nutkins
   CONFIG_FILE_NAME = 'nutkins.yaml'
   IMG_CONFIG_FILE_NAME = 'nutkin.yaml'
+  VOLUMES_PATH = 'volumes'
 
   def self.download_file url, output
     orig_url = url
@@ -54,6 +55,20 @@ module Nutkins
     end
   end
 
+  module Secrets
+    def get_secrets source
+      dest = source.sub /\.gpg$/
+      system "gpg #{source}"
+      raise "could not decrypt #{archive_enc}" unless File.exists? dest
+      File.chmod 0600, dest
+
+      if dest =~ /\.tar$/
+        dest_dir = File.dirname source
+        system "tar xf #{archive} -C #{dest_dir}"
+      end
+    end
+  end
+
   class CloudManager
     def initialize(project_dir: nil)
       @project_root = project_dir || Dir.pwd
@@ -91,7 +106,29 @@ module Nutkins
     end
 
     def create img_name
-      puts "TODO: create #{img_name}"
+      img_dir = get_image_dir img_name
+      cfg = get_image_config img_name
+      tag = @repository + '/' + img_name
+      flags = []
+      create_cfg = cfg["create"]
+      if create_cfg
+        (create_cfg["ports"] or []).each do |port|
+          flags.push '-p', "#{port}:#{port}"
+        end
+
+        (create_cfg["volumes"] or []).each do |volume|
+          src, dest = volume.split ' -> '
+          src = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
+          flags.push '-v', "#{src}:#{dest}"
+        end
+      end
+
+      if system "docker", "create", *flags, tag
+        # TODO: delete other containers from this image
+        puts "created `#{img_name}' container"
+      else
+        puts "failed to create `#{img_name}' container"
+      end
     end
 
     def delete img_name
