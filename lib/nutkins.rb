@@ -209,6 +209,7 @@ module Nutkins
           secret = secret[0..-5]
           if File.extname(secret) == '.tar'
             system "tar", "xzf", secret, "-C", File.dirname(secret)
+            File.unlink secret
           end
         end
       end
