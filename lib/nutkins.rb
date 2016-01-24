@@ -5,6 +5,8 @@ require "uri"
 require "fileutils"
 require "json"
 
+require "nutkins/docker"
+require "nutkins/download"
 require "nutkins/version"
 
 # Must be somedomain.net instead of somedomain.net/, otherwise, it will throw exception.
@@ -13,72 +15,6 @@ module Nutkins
   IMG_CONFIG_FILE_NAME = 'nutkin.yaml'
   VOLUMES_PATH = 'volumes'
 
-  def self.download_file url, output
-    orig_url = url
-    tries = 10
-    while (tries -= 1) >= 0
-      response = Net::HTTP.get_response(URI(url))
-      case response
-      when Net::HTTPRedirection
-        url = response["location"]
-      else
-        open(output, "wb") do |file|
-          file.write(response.body)
-        end
-        return
-      end
-    end
-
-    raise "could not download #{orig_url}"
-  end
-
-  def self.download_resources img_dir, resources
-    resources.each do |resource|
-      source = resource["source"]
-      dest = File.join(img_dir, resource["dest"])
-      unless File.exists? dest
-        FileUtils.mkdir_p File.dirname(dest)
-        print "downloading #{source}"
-        Nutkins.download_file source, dest
-        puts " - done"
-        mode = resource["mode"]
-        File.chmod(mode, dest) if mode
-      end
-    end
-  end
-
-  module Docker
-    def self.image_id_for_tag tag
-      regex = /^#{tag} +/
-      `docker images`.each_line do |line|
-        return line.split(' ')[2] if line =~ regex
-      end
-      nil
-    end
-
-    def self.container_id_for_tag tag
-      regex = /^[0-9a-f]+ +#{tag} +/
-      `docker ps -a`.each_line do |line|
-        return line.split(' ')[0] if line =~ regex
-      end
-      nil
-    end
-  end
-
-  module Secrets
-    def get_secrets source
-      dest = source.sub /\.gpg$/
-      system "gpg #{source}"
-      raise "could not decrypt #{archive_enc}" unless File.exists? dest
-      File.chmod 0600, dest
-
-      if dest =~ /\.tar$/
-        dest_dir = File.dirname source
-        system "tar xf #{archive} -C #{dest_dir}"
-      end
-    end
-  end
-
   class CloudManager
     def initialize(project_dir: nil)
       @project_root = project_dir || Dir.pwd
@@ -86,7 +22,6 @@ module Nutkins
       raise "must create nutkins.yaml in project root" unless File.exists? cfg_path
       @config = OpenStruct.new(YAML.load_file cfg_path)
       @repository = @config.repository
-      raise "must add `repository' entry to nutkins.yaml" if @repository.nil?
     end
 
     def build img_name
@@ -98,7 +33,7 @@ module Nutkins
       if build_cfg
         # download each of the files in the resources section if it doesn't exist
         resources = build_cfg["resources"]
-        Nutkins.download_resources img_dir, resources if resources
+        Dowload.download_resources img_dir, resources if resources
       end
 
       tag = get_tag img_name
@@ -229,6 +164,7 @@ module Nutkins
     end
 
     def get_tag tag
+      raise "command requires `repository' entry in nutkins.yaml or nutkin.yaml" if @repository.nil?
       @repository + '/' + tag
     end
 
