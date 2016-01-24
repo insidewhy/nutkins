@@ -136,7 +136,6 @@ module Nutkins
       prev_container_id = Docker.container_id_for_tag tag unless preserve
       puts "creating new docker image"
       unless system "docker", "create", "-it", *flags, tag, *docker_args
-        # TODO: delete other containers from this image
         raise "failed to create `#{img_name}' container"
       end
 
@@ -187,7 +186,7 @@ module Nutkins
       path_is_dir = Dir.exists? path
       if path_is_dir
         secret += '.tar'
-        system "tar", "czf", secret, "-C", File.dirname(path), File.basename(path)
+        system "tar", "cf", secret, "-C", File.dirname(path), File.basename(path)
       end
 
       loop do
@@ -208,7 +207,7 @@ module Nutkins
 
           secret = secret[0..-5]
           if File.extname(secret) == '.tar'
-            system "tar", "xzf", secret, "-C", File.dirname(secret)
+            system "tar", "xf", secret, "-C", File.dirname(secret)
             File.unlink secret
           end
         end
