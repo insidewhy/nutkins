@@ -132,9 +132,16 @@ module Nutkins
       end
 
       tag = get_tag img_name
+      prev_container_id = Docker.container_id_for_tag tag
       unless system "docker", "create", "-it", *flags, tag
         # TODO: delete other containers from this image
         raise "failed to create `#{img_name}' container"
+      end
+
+      container_id = Docker.container_id_for_tag tag
+      if not prev_container_id.nil? and container_id != prev_container_id
+        puts "deleting previous container #{prev_container_id}"
+        system "docker", "rm", prev_container_id
       end
 
       puts "created `#{img_name}' container"
