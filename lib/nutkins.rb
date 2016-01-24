@@ -132,18 +132,22 @@ module Nutkins
       end
 
       tag = get_tag img_name
-      if system "docker", "create", "-it", *flags, tag
+      unless system "docker", "create", "-it", *flags, tag
         # TODO: delete other containers from this image
-        puts "created `#{img_name}' container"
-      else
-        puts "failed to create `#{img_name}' container"
+        raise "failed to create `#{img_name}' container"
       end
+
+      puts "created `#{img_name}' container"
     end
 
     def run img_name
       tag = get_tag img_name
       id = Docker.container_id_for_tag tag
-      raise "no container for image #{img_name}" unless id
+      if not id
+        create img_name
+        id = Docker.container_id_for_tag tag
+        raise "couldn't create container to run `#{img_name}'" unless id
+      end
       Kernel.exec "docker", "start", "-ai", id
     end
 
