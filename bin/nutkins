@@ -7,7 +7,7 @@ require 'ostruct'
 
 module Nutkins::Command
   def self.run args
-    config = nil
+    global_config = nil
     command = nil
 
     Moister::SubcommandOptionParser.new do |op|
@@ -41,7 +41,7 @@ module Nutkins::Command
 
       parsed_cfg = op.parse(args).to_h
 
-      config = OpenStruct.new parsed_cfg[:config]
+      global_config = OpenStruct.new parsed_cfg[:config]
       command = parsed_cfg[:command]
     end
 
@@ -50,26 +50,26 @@ module Nutkins::Command
       exit 1
     end
 
-    nutkins = Nutkins::CloudManager.new(project_dir: config.project_dir)
-    cmd_config = OpenStruct.new config[command]
+    nutkins = Nutkins::CloudManager.new(project_dir: global_config.project_dir)
+    config = OpenStruct.new global_config[command]
 
     case command
     when 'build'
-      cmd_config.names.each &nutkins.method(:build)
+      config.names.each &nutkins.method(:build)
     when 'create'
-      cmd_config.names.each do |name|
-        nutkins.create name, preserve: cmd_config.preserve
+      config.names.each do |name|
+        nutkins.create name, preserve: config.preserve
       end
     when 'delete'
-      cmd_config.names.each &nutkins.method(:delete)
+      config.names.each &nutkins.method(:delete)
     when 'delete-all'
       nutkins.delete_all
     when 'rebuild-secrets'
-      nutkins.rebuild_secrets cmd_config.paths
+      nutkins.rebuild_secrets config.paths
     when 'run'
-      nutkins.run cmd_config.name, reuse: cmd_config.reuse, shell: cmd_config.shell
+      nutkins.run config.name, reuse: config.reuse, shell: config.shell
     when 'exec'
-      nutkins.exec cmd_config.name, cmd_config.cmd
+      nutkins.exec config.name, config.cmd
     end
   rescue RuntimeError => e
     puts e.to_s
