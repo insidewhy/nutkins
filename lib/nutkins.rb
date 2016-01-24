@@ -3,6 +3,7 @@ require "ostruct"
 require "net/http"
 require "uri"
 require "fileutils"
+require "json"
 
 require "nutkins/version"
 
@@ -114,7 +115,7 @@ module Nutkins
       end
     end
 
-    def create img_name, preserve: false
+    def create img_name, preserve: false, docker_args: []
       flags = []
       cfg = get_image_config img_name
       create_cfg = cfg["create"]
@@ -133,7 +134,8 @@ module Nutkins
 
       tag = get_tag img_name
       prev_container_id = Docker.container_id_for_tag tag unless preserve
-      unless system "docker", "create", "-it", *flags, tag
+      puts "creating new docker image"
+      unless system "docker", "create", "-it", *flags, tag, *docker_args
         # TODO: delete other containers from this image
         raise "failed to create `#{img_name}' container"
       end
@@ -149,14 +151,26 @@ module Nutkins
       puts "created `#{img_name}' container"
     end
 
-    def run img_name, reuse: false
+    def run img_name, reuse: false, shell: false
       tag = get_tag img_name
+      create_args = []
+      if shell
+        raise '--shell and --reuse arguments are incompatible' if reuse
+
+        # TODO: test for smell-baron
+        create_args = JSON.parse(`docker inspect #{tag}`)[0]["Config"]["Cmd"]
+        create_args.unshift '/bin/bash', '---'
+        create_args.unshift '-f' unless create_args[0] == '-f'
+        # TODO: provide version that doesn't require smell-baron
+      end
+
       id = reuse ? Docker.container_id_for_tag(tag) : nil
       if not id
-        create img_name
+        create img_name, docker_args: create_args
         id = Docker.container_id_for_tag tag
         raise "couldn't create container to run `#{img_name}'" unless id
       end
+
       Kernel.exec "docker", "start", "-ai", id
     end
 
@@ -170,10 +184,6 @@ module Nutkins
 
     def rebuild_secrets paths
       puts "TODO: rebuild_secrets #{paths}"
-    end
-
-    def shell img_name
-      puts "TODO: shell #{img_name}"
     end
 
     def exec img_name, *cmd

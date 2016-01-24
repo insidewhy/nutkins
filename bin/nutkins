@@ -33,9 +33,9 @@ module Nutkins::Command
 
       op.subcommand 'run,r name', 'run created container' do |subop|
         subop.on '-r', '--reuse', 'reuse previously created container', 'reuse'
+        subop.on '-s', '--shell', 'add bash shell to console', 'shell'
       end
 
-      op.subcommand 'shell,s name', 'run created container with shell hiding usual container output'
       op.subcommand 'exec,e name *cmd', 'execute a command in a running container'
       op.subcommand 'rebuild-secrets,S [*paths]', 'rebuild secrets files'
 
@@ -67,9 +67,7 @@ module Nutkins::Command
     when 'rebuild-secrets'
       nutkins.rebuild_secrets cmd_config.paths
     when 'run'
-      nutkins.run cmd_config.name, reuse: cmd_config.reuse
-    when 'shell'
-      nutkins.shell cmd_config.name
+      nutkins.run cmd_config.name, reuse: cmd_config.reuse, shell: cmd_config.shell
     when 'exec'
       nutkins.exec cmd_config.name, cmd_config.cmd
     end
