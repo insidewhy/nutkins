@@ -114,7 +114,7 @@ module Nutkins
       end
     end
 
-    def create img_name
+    def create img_name, preserve: false
       flags = []
       cfg = get_image_config img_name
       create_cfg = cfg["create"]
@@ -132,24 +132,26 @@ module Nutkins
       end
 
       tag = get_tag img_name
-      prev_container_id = Docker.container_id_for_tag tag
+      prev_container_id = Docker.container_id_for_tag tag unless preserve
       unless system "docker", "create", "-it", *flags, tag
         # TODO: delete other containers from this image
         raise "failed to create `#{img_name}' container"
       end
 
-      container_id = Docker.container_id_for_tag tag
-      if not prev_container_id.nil? and container_id != prev_container_id
-        puts "deleting previous container #{prev_container_id}"
-        system "docker", "rm", prev_container_id
+      unless preserve
+        container_id = Docker.container_id_for_tag tag
+        if not prev_container_id.nil? and container_id != prev_container_id
+          puts "deleting previous container #{prev_container_id}"
+          system "docker", "rm", prev_container_id
+        end
       end
 
       puts "created `#{img_name}' container"
     end
 
-    def run img_name
+    def run img_name, reuse: false
       tag = get_tag img_name
-      id = Docker.container_id_for_tag tag
+      id = reuse ? Docker.container_id_for_tag(tag) : nil
       if not id
         create img_name
         id = Docker.container_id_for_tag tag

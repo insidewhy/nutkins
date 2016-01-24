@@ -23,10 +23,18 @@ module Nutkins::Command
       op.on '-p', '--project dir', 'override path to project', 'project_dir'
 
       op.subcommand 'build,b *names', 'build docker image from dockerfile'
-      op.subcommand 'create,c *names', 'create container from image'
+
+      op.subcommand 'create,c *names', 'create container from image' do |subop|
+        subop.on '-p', '--preserve', 'preserve existing container', 'preserve'
+      end
+
       op.subcommand 'delete,d *names', 'delete container corresponding to image'
       op.subcommand 'delete-all', 'delete containers corresponding to all images'
-      op.subcommand 'run,r name', 'run created container'
+
+      op.subcommand 'run,r name', 'run created container' do |subop|
+        subop.on '-r', '--reuse', 'reuse previously created container', 'reuse'
+      end
+
       op.subcommand 'shell,s name', 'run created container with shell hiding usual container output'
       op.subcommand 'exec,e name *cmd', 'execute a command in a running container'
       op.subcommand 'rebuild-secrets,S [*paths]', 'rebuild secrets files'
@@ -49,7 +57,9 @@ module Nutkins::Command
     when 'build'
       cmd_config.names.each &nutkins.method(:build)
     when 'create'
-      cmd_config.names.each &nutkins.method(:create)
+      cmd_config.names.each do |name|
+        nutkins.create name, preserve: cmd_config.preserve
+      end
     when 'delete'
       cmd_config.names.each &nutkins.method(:delete)
     when 'delete-all'
@@ -57,7 +67,7 @@ module Nutkins::Command
     when 'rebuild-secrets'
       nutkins.rebuild_secrets cmd_config.paths
     when 'run'
-      nutkins.run cmd_config.name
+      nutkins.run cmd_config.name, reuse: cmd_config.reuse
     when 'shell'
       nutkins.shell cmd_config.name
     when 'exec'
