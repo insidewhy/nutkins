@@ -37,7 +37,8 @@ module Nutkins::Command
       end
 
       op.subcommand 'exec,e name *cmd', 'execute a command in a running container'
-      op.subcommand 'rebuild-secrets,S [*paths]', 'rebuild secrets files'
+      op.subcommand 'build-secret,B path', 'build secret files/volumes'
+      op.subcommand 'extract-secrets,X [*names]', 'extract secret files/volumes'
 
       parsed_cfg = op.parse(args).to_h
 
@@ -64,12 +65,14 @@ module Nutkins::Command
       config.names.each &nutkins.method(:delete)
     when 'delete-all'
       nutkins.delete_all
-    when 'rebuild-secrets'
-      nutkins.rebuild_secrets config.paths
     when 'run'
       nutkins.run config.name, reuse: config.reuse, shell: config.shell
     when 'exec'
       nutkins.exec config.name, config.cmd
+    when 'build-secret'
+      nutkins.build_secret config.path
+    when 'extract-secrets'
+      nutkins.extract_secrets config.names
     end
   rescue RuntimeError => e
     puts e.to_s

@@ -165,7 +165,7 @@ module Nutkins
       end
 
       id = reuse ? Docker.container_id_for_tag(tag) : nil
-      if not id
+      unless id
         create img_name, docker_args: create_args
         id = Docker.container_id_for_tag tag
         raise "couldn't create container to run `#{img_name}'" unless id
@@ -182,8 +182,36 @@ module Nutkins
       puts "TODO: delete_all"
     end
 
-    def rebuild_secrets paths
-      puts "TODO: rebuild_secrets #{paths}"
+    def build_secret path
+      secret = path
+      path_is_dir = Dir.exists? path
+      if path_is_dir
+        secret += '.tar'
+        system "tar", "czf", secret, "-C", File.dirname(path), File.basename(path)
+      end
+
+      loop do
+        puts "enter passphrase for #{secret}"
+        break if system 'gpg', '-c', secret
+      end
+
+      File.unlink secret if path_is_dir
+    end
+
+    def extract_secrets img_names
+      get_image_names(img_names).each do |img_name|
+        get_secrets(img_name).each do |secret|
+          loop do
+            puts "enter passphrase for #{secret}"
+            break if system 'gpg', secret
+          end
+
+          secret = secret[0..-5]
+          if File.extname(secret) == '.tar'
+            system "tar", "xzf", secret, "-C", File.dirname(secret)
+          end
+        end
+      end
     end
 
     def exec img_name, *cmd
@@ -202,6 +230,21 @@ module Nutkins
 
     def get_tag tag
       @repository + '/' + tag
+    end
+
+    def get_image_names img_names
+      if img_names.empty?
+        Dir.glob("#{@project_root}/*/Dockerfile").map do |path|
+          File.basename File.dirname(path)
+        end
+      else
+        img_names
+      end
+    end
+
+    def get_secrets img_name
+      img_dir = get_image_dir img_name
+      Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
     end
   end
 end
