@@ -22,13 +22,14 @@ module Nutkins::Command
 
       op.on '-p', '--project dir', 'override path to project', 'project_dir'
 
-      op.subcommand 'build *names', 'build docker image from dockerfile'
-      op.subcommand 'create *names', 'create container from image'
-      op.subcommand 'delete *names', 'delete container corresponding to image'
+      op.subcommand 'build,b *names', 'build docker image from dockerfile'
+      op.subcommand 'create,c *names', 'create container from image'
+      op.subcommand 'delete,d *names', 'delete container corresponding to image'
       op.subcommand 'delete-all', 'delete containers corresponding to all images'
-      op.subcommand 'run name', 'run created container'
-      op.subcommand 'shell name', 'run created container with shell hiding usual container output'
-      op.subcommand 'exec name *cmd', 'execute a command in a running container'
+      op.subcommand 'run,r name', 'run created container'
+      op.subcommand 'shell,s name', 'run created container with shell hiding usual container output'
+      op.subcommand 'exec,e name *cmd', 'execute a command in a running container'
+      op.subcommand 'rebuild-secrets,S [*paths]', 'rebuild secrets files'
 
       parsed_cfg = op.parse(args).to_h
 
@@ -53,6 +54,8 @@ module Nutkins::Command
       cmd_config.names.each &nutkins.method(:delete)
     when 'delete-all'
       nutkins.delete_all
+    when 'rebuild-secrets'
+      nutkins.rebuild_secrets cmd_config.paths
     when 'run'
       nutkins.run cmd_config.name
     when 'shell'

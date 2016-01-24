@@ -52,6 +52,15 @@ module Nutkins
       `docker images`.each_line do |line|
         return line.split(' ')[2] if line =~ regex
       end
+      nil
+    end
+
+    def self.container_id_for_tag tag
+      regex = /^[0-9a-f]+ +#{tag} +/
+      `docker ps -a`.each_line do |line|
+        return line.split(' ')[0] if line =~ regex
+      end
+      nil
     end
   end
 
@@ -91,12 +100,12 @@ module Nutkins
         Nutkins.download_resources img_dir, resources if resources
       end
 
-      tag = @repository + '/' + img_name
+      tag = get_tag img_name
       prev_image_id = Docker.image_id_for_tag tag
 
       if system "docker", "build", "-t", tag, img_dir
         image_id = Docker.image_id_for_tag tag
-        if image_id != prev_image_id
+        if not prev_image_id.nil? and image_id != prev_image_id
           puts "deleting previous image #{prev_image_id}"
           system "docker", "rmi", prev_image_id
         end
@@ -106,16 +115,15 @@ module Nutkins
     end
 
     def create img_name
-      img_dir = get_image_dir img_name
-      cfg = get_image_config img_name
-      tag = @repository + '/' + img_name
       flags = []
+      cfg = get_image_config img_name
       create_cfg = cfg["create"]
       if create_cfg
         (create_cfg["ports"] or []).each do |port|
           flags.push '-p', "#{port}:#{port}"
         end
 
+        img_dir = get_image_dir img_name
         (create_cfg["volumes"] or []).each do |volume|
           src, dest = volume.split ' -> '
           src = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
@@ -123,12 +131,20 @@ module Nutkins
         end
       end
 
-      if system "docker", "create", *flags, tag
+      tag = get_tag img_name
+      if system "docker", "create", "-it", *flags, tag
         # TODO: delete other containers from this image
         puts "created `#{img_name}' container"
       else
         puts "failed to create `#{img_name}' container"
       end
+    end
+
+    def run img_name
+      tag = get_tag img_name
+      id = Docker.container_id_for_tag tag
+      raise "no container for image #{img_name}" unless id
+      Kernel.exec "docker", "start", "-ai", id
     end
 
     def delete img_name
@@ -139,8 +155,8 @@ module Nutkins
       puts "TODO: delete_all"
     end
 
-    def run img_name
-      puts "TODO: run #{img_name}"
+    def rebuild_secrets paths
+      puts "TODO: rebuild_secrets #{paths}"
     end
 
     def shell img_name
@@ -159,6 +175,10 @@ module Nutkins
 
     def get_image_dir img_name
       File.join(@project_root, img_name)
+    end
+
+    def get_tag tag
+      @repository + '/' + tag
     end
   end
 end
