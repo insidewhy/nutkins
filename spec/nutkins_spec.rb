@@ -3,7 +3,7 @@ require 'spec_helper'
 require 'yaml'
 
 describe Nutkins do
-  def file_exists path, content
+  def yaml_file_exists path, content
     expect(File).to receive(:exists?).with(path) { true }
     expect(YAML).to receive(:load_file).with(path) { content }
   end
@@ -20,16 +20,25 @@ describe Nutkins do
     expect(@nutkins).to receive(:run_docker).with(*args) { true }
   end
 
-
   def make_nutkins project_dir = '.', nutkins_content = nil
+    @img = 'some-image'
+    @repo = 'kittens'
+    @tag = @repo + '/' + @img
+    @project_dir = project_dir
+    @img_dir = File.join(@project_dir, @img)
+
     nutkins_yaml = './nutkins.yaml'
     if nutkins_content
-      file_exists nutkins_yaml, nutkins_content
+      yaml_file_exists nutkins_yaml, nutkins_content
     else
       no_file nutkins_yaml
     end
-    @project_dir = project_dir
-    @nutkins = Nutkins::CloudManager.new project_dir: project_dir
+    @nutkins = Nutkins::CloudManager.new project_dir: @project_dir
+  end
+
+  def expect_image_dir nutkin_yaml
+    yaml_file_exists File.join(@img_dir, 'nutkin.yaml'), nutkin_yaml
+    dir_exists @img_dir
   end
 
   it 'has a version number' do
@@ -37,17 +46,9 @@ describe Nutkins do
   end
 
   it 'builds a docker image' do
-    img = 'some-image'
-    repo = 'kittens'
-    tag = repo + '/' + img
-
     make_nutkins
-
-    img_dir = File.join(@project_dir, img)
-    file_exists File.join(img_dir, 'nutkin.yaml'), { "repository" => repo }
-    dir_exists img_dir
-    expect_docker "build", "-t", tag, img_dir
-
+    expect_image_dir({ "repository" => @repo })
+    expect_docker "build", "-t", @tag, @img_dir
     @nutkins.build 'some-image'
   end
 end
