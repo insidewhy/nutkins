@@ -28,10 +28,15 @@ module Nutkins
       end
     end
 
-    def build img_name
+    def build img_name = '.'
       cfg = get_image_config img_name
       img_dir = get_project_dir img_name
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
+
+      if img_name == '.'
+        img_name = cfg["image"]
+        raise "nutkin.yaml requires image entry for `build .'" unless img_name
+      end
 
       build_cfg = cfg["build"]
       if build_cfg
@@ -103,7 +108,7 @@ module Nutkins
         # TODO: provide version that doesn't require smell-baron
       end
 
-      id = reuse ? Docker.container_id_for_tag(tag) : nil
+      id = reuse && Docker.container_id_for_tag(tag)
       unless id
         create img_name, docker_args: create_args
         id = Docker.container_id_for_tag tag
@@ -163,8 +168,8 @@ module Nutkins
     end
 
     private
-    def get_image_config img_name
-      img_cfg_path = File.join get_project_dir(img_name), IMG_CONFIG_FILE_NAME
+    def get_image_config path
+      img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
       @repository = img_cfg['repository'] || @config.repository
       img_cfg
