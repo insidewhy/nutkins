@@ -30,7 +30,7 @@ module Nutkins
 
     def build img_name
       cfg = get_image_config img_name
-      img_dir = get_image_dir img_name
+      img_dir = get_project_dir img_name
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
 
       build_cfg = cfg["build"]
@@ -63,7 +63,7 @@ module Nutkins
           flags.push '-p', "#{port}:#{port}"
         end
 
-        img_dir = get_image_dir img_name
+        img_dir = get_project_dir img_name
         (create_cfg["volumes"] or []).each do |volume|
           src, dest = volume.split ' -> '
           src = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
@@ -138,7 +138,11 @@ module Nutkins
     end
 
     def extract_secrets img_names
-      get_image_names(img_names).each do |img_name|
+      with_current = img_names.empty?
+      img_names = get_image_names(img_names)
+      img_names.push '.' if with_current
+
+      img_names.each do |img_name|
         get_secrets(img_name).each do |secret|
           loop do
             puts "enter passphrase for #{secret}"
@@ -160,14 +164,14 @@ module Nutkins
 
     private
     def get_image_config img_name
-      img_cfg_path = File.join get_image_dir(img_name), IMG_CONFIG_FILE_NAME
+      img_cfg_path = File.join get_project_dir(img_name), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
       @repository = img_cfg['repository'] || @config.repository
       img_cfg
     end
 
-    def get_image_dir img_name
-      File.join(@project_root, img_name)
+    def get_project_dir path
+      path == '.' ? @project_root : File.join(@project_root, path)
     end
 
     def get_tag tag
@@ -185,8 +189,9 @@ module Nutkins
       end
     end
 
+    # can supply img_name or . for project root
     def get_secrets img_name
-      img_dir = get_image_dir img_name
+      img_dir = get_project_dir img_name
       Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
     end
 
