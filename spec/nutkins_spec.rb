@@ -54,8 +54,8 @@ describe Nutkins do
   end
 
   it 'builds a docker image in a subdirectory' do
-    make_nutkins
-    expect_image_dir({ "repository" => @repo })
+    make_nutkins nutkins_content: { "repository" => @repo }
+    expect_image_dir
     expect_docker "build", "-t", @tag, @img_dir
     @nutkins.build 'some-image'
   end
