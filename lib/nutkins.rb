@@ -5,6 +5,8 @@ require "uri"
 require "fileutils"
 require "json"
 
+module Nutkins ; end
+
 require "nutkins/docker"
 require "nutkins/download"
 require "nutkins/version"
@@ -19,9 +21,11 @@ module Nutkins
     def initialize(project_dir: nil)
       @project_root = project_dir || Dir.pwd
       cfg_path = File.join(@project_root, CONFIG_FILE_NAME)
-      raise "must create nutkins.yaml in project root" unless File.exists? cfg_path
-      @config = OpenStruct.new(YAML.load_file cfg_path)
-      @repository = @config.repository
+      if File.exists? cfg_path
+        @config = OpenStruct.new(YAML.load_file cfg_path)
+      else
+        @config = OpenStruct.new
+      end
     end
 
     def build img_name
@@ -39,11 +43,11 @@ module Nutkins
       tag = get_tag img_name
       prev_image_id = Docker.image_id_for_tag tag
 
-      if system "docker", "build", "-t", tag, img_dir
+      if run_docker "build", "-t", tag, img_dir
         image_id = Docker.image_id_for_tag tag
         if not prev_image_id.nil? and image_id != prev_image_id
           puts "deleting previous image #{prev_image_id}"
-          system "docker", "rmi", prev_image_id
+          run_docker "rmi", prev_image_id
         end
       else
         raise "issue building docker image for #{img_name}"
@@ -70,7 +74,7 @@ module Nutkins
       tag = get_tag img_name
       prev_container_id = Docker.container_id_for_tag tag unless preserve
       puts "creating new docker image"
-      unless system "docker", "create", "-it", *flags, tag, *docker_args
+      unless run_docker "create", "-it", *flags, tag, *docker_args
         raise "failed to create `#{img_name}' container"
       end
 
@@ -78,7 +82,7 @@ module Nutkins
         container_id = Docker.container_id_for_tag tag
         if not prev_container_id.nil? and container_id != prev_container_id
           puts "deleting previous container #{prev_container_id}"
-          system "docker", "rm", prev_container_id
+          run_docker "rm", prev_container_id
         end
       end
 
@@ -86,6 +90,7 @@ module Nutkins
     end
 
     def run img_name, reuse: false, shell: false
+      cfg = get_image_config img_name
       tag = get_tag img_name
       create_args = []
       if shell
@@ -156,7 +161,9 @@ module Nutkins
     private
     def get_image_config img_name
       img_cfg_path = File.join get_image_dir(img_name), IMG_CONFIG_FILE_NAME
-      File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
+      img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
+      @repository = img_cfg['repository'] || @config.repository
+      img_cfg
     end
 
     def get_image_dir img_name
@@ -181,6 +188,10 @@ module Nutkins
     def get_secrets img_name
       img_dir = get_image_dir img_name
       Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
+    end
+
+    def run_docker *args
+      system 'docker', *args
     end
   end
 end
