@@ -1,5 +1,7 @@
 # Nutkins
 
+[![build status](https://circleci.com/gh/ohjames/nutkins.png)](https://circleci.com/gh/ohjames/nutkins)
+
 Nutkins is a tool to manage and test a CoreOS cluster:
  * Config for each service is stored in a directory including an optional `config.yaml` and a `Dockerfile`.
  * Easy to create and run test instances of any service in a single command.
