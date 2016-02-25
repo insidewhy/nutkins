@@ -42,7 +42,7 @@ module Nutkins
       if build_cfg
         # download each of the files in the resources section if it doesn't exist
         resources = build_cfg["resources"]
-        Dowload.download_resources img_dir, resources if resources
+        Download.download_resources img_dir, resources if resources
       end
 
       tag = get_tag img_name
