@@ -65,6 +65,6 @@ describe Nutkins do
     @img_dir = @project_dir
     expect_image_dir({ "repository" => @repo, "image" => @img })
     expect_docker "build", "-t", @tag, @img_dir
-    @nutkins.build
+    @nutkins.build '.'
   end
 end

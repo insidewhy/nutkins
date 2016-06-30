@@ -28,15 +28,11 @@ module Nutkins
       end
     end
 
-    def build img_name = '.'
+    def build img_name
       cfg = get_image_config img_name
       img_dir = get_project_dir img_name
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
-
-      if img_name == '.'
-        img_name = cfg["image"]
-        raise "nutkin.yaml requires image entry for `build .'" unless img_name
-      end
+      tag = get_tag cfg
 
       build_cfg = cfg["build"]
       if build_cfg
@@ -45,7 +41,6 @@ module Nutkins
         Download.download_resources img_dir, resources if resources
       end
 
-      tag = get_tag img_name
       prev_image_id = Docker.image_id_for_tag tag
 
       if run_docker "build", "-t", tag, img_dir
@@ -80,7 +75,7 @@ module Nutkins
         end
       end
 
-      tag = get_tag img_name
+      tag = get_tag cfg
       prev_container_id = Docker.container_id_for_tag tag unless preserve
       puts "creating new docker image"
       unless run_docker "create", "-it", *flags, tag, *docker_args
@@ -100,7 +95,7 @@ module Nutkins
 
     def run img_name, reuse: false, shell: false
       cfg = get_image_config img_name
-      tag = get_tag img_name
+      tag = get_tag cfg
       create_args = []
       if shell
         raise '--shell and --reuse arguments are incompatible' if reuse
@@ -175,7 +170,9 @@ module Nutkins
     def get_image_config path
       img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
-      @repository = img_cfg['repository'] || @config.repository
+      if path != '.'
+        img_cfg["image"] = path
+      end
       img_cfg
     end
 
@@ -183,9 +180,16 @@ module Nutkins
       path == '.' ? @project_root : File.join(@project_root, path)
     end
 
-    def get_tag tag
-      raise "command requires `repository' entry in nutkins.yaml or nutkin.yaml" if @repository.nil?
-      @repository + '/' + tag
+    def get_tag img_cfg
+      unless img_cfg.has_key? "image"
+        raise "nutkins.yaml should contain `image' entry for this command"
+      end
+
+      repository = img_cfg['repository'] || @config.repository
+      if repository.nil?
+        raise "nutkins.yaml or nutkin.yaml should contain `repository' entry for this command"
+      end
+      repository + '/' + img_cfg['image']
     end
 
     def get_all_img_names img_names

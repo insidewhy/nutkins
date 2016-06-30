@@ -58,12 +58,7 @@ module Nutkins::Command
 
     case command
     when 'build'
-      names = config.names
-      if names.empty?
-        nutkins.build
-      else
-        config.names.each &nutkins.method(:build)
-      end
+      config.names.each &nutkins.method(:build)
     when 'create'
       config.names.each do |name|
         nutkins.create name, preserve: config.preserve
