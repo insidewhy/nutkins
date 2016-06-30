@@ -170,9 +170,7 @@ module Nutkins
     def get_image_config path
       img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
-      if path != '.'
-        img_cfg["image"] = path
-      end
+      img_cfg["image"] ||= path if path != '.'
       img_cfg
     end
 
