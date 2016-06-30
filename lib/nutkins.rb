@@ -147,9 +147,9 @@ module Nutkins
     end
 
     def extract_secrets img_names
-      with_current = img_names.empty?
-      img_names = get_image_names(img_names)
-      img_names.push '.' if with_current
+      if img_names.empty?
+        img_names = get_all_img_names(img_names).push '.'
+      end
 
       img_names.each do |img_name|
         get_secrets(img_name).each do |secret|
@@ -188,13 +188,9 @@ module Nutkins
       @repository + '/' + tag
     end
 
-    def get_image_names img_names
-      if img_names.empty?
-        Dir.glob("#{@project_root}/*/Dockerfile").map do |path|
-          File.basename File.dirname(path)
-        end
-      else
-        img_names
+    def get_all_img_names img_names
+      Dir.glob("#{@project_root}/*/Dockerfile").map do |path|
+        File.basename File.dirname(path)
       end
     end
 
