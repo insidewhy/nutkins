@@ -74,6 +74,10 @@ module Nutkins
           src = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
           flags.push '-v', "#{src}:#{dest}"
         end
+
+        (create_cfg["env"] or {}).each do |name, val|
+          flags.push '-e', "#{name}=#{val}"
+        end
       end
 
       tag = get_tag img_name
