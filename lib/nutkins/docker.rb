@@ -18,11 +18,11 @@ module Nutkins::Docker
   end
 
   def self.container_id_for_name name
-    stdout, stderr, status = Open3.capture3 'docker', 'inspect', '--format="{{.Id}}"', name
-    status.success? && stdout.chomp
+    self.run 'inspect', '--format="{{.Id}}"', name
   end
 
   def self.run *args
-    system 'docker', *args
+    stdout, stderr, status = Open3.capture3 'docker', *args
+    status.success? && stdout.chomp
   end
 end
