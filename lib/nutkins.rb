@@ -102,8 +102,13 @@ module Nutkins
 
         # TODO: test for smell-baron
         create_args = JSON.parse(`docker inspect #{tag}`)[0]["Config"]["Cmd"]
+
+        kill_everything = create_args[0] == '-a'
+        create_args.shift if kill_everything
+
         create_args.unshift '/bin/bash', '---'
         create_args.unshift '-f' unless create_args[0] == '-f'
+        create_args.unshift '-a' if kill_everything
         # TODO: provide version that doesn't require smell-baron
       end
 
