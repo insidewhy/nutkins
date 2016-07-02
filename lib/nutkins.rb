@@ -118,7 +118,12 @@ module Nutkins
     end
 
     def delete img_name
-      puts "TODO: delete #{img_name}"
+      cfg = get_image_config img_name
+      tag = get_tag cfg
+      container_id = Docker.container_id_for_tag tag
+      raise "no container to delete" if container_id.nil?
+      puts "deleting container #{container_id}"
+      run_docker "rm", container_id
     end
 
     def delete_all
