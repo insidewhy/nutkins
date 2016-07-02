@@ -43,11 +43,11 @@ module Nutkins
 
       prev_image_id = Docker.image_id_for_tag tag
 
-      if run_docker "build", "-t", tag, img_dir
+      if Docker.run "build", "-t", tag, img_dir
         image_id = Docker.image_id_for_tag tag
         if not prev_image_id.nil? and image_id != prev_image_id
           puts "deleting previous image #{prev_image_id}"
-          run_docker "rmi", prev_image_id
+          Docker.run "rmi", prev_image_id
         end
       else
         raise "issue building docker image for #{img_name}"
@@ -78,7 +78,7 @@ module Nutkins
       tag = get_tag cfg
       prev_container_id = Docker.container_id_for_tag tag unless preserve
       puts "creating new docker image"
-      unless run_docker "create", "-it", *flags, tag, *docker_args
+      unless Docker.run "create", "-it", *flags, tag, *docker_args
         raise "failed to create `#{img_name}' container"
       end
 
@@ -86,7 +86,7 @@ module Nutkins
         container_id = Docker.container_id_for_tag tag
         if not prev_container_id.nil? and container_id != prev_container_id
           puts "deleting previous container #{prev_container_id}"
-          run_docker "rm", prev_container_id
+          Docker.run "rm", prev_container_id
         end
       end
 
@@ -128,7 +128,7 @@ module Nutkins
       container_id = Docker.container_id_for_tag tag
       raise "no container to delete" if container_id.nil?
       puts "deleting container #{container_id}"
-      run_docker "rm", container_id
+      Docker.run "rm", container_id
     end
 
     def delete_all
@@ -176,7 +176,28 @@ module Nutkins
       puts "TODO: exec #{img_name}: #{cmd.join ' '}"
     end
 
+    def start_etcd_container
+      name = get_etcd_container_name
+      return unless name
+      existing = Docker.container_id_for_name name
+      unless existing
+        Docker.run 'create', '--name', name, '-p', '4001:4001', 'microbox/etcd:latest', '-name', name
+      end
+      Docker.run 'start', name
+    end
+
+    def stop_etcd_container
+      name = get_etcd_container_name
+      return unless name
+      Docker.run 'stop', name
+    end
+
     private
+    def get_etcd_container_name
+      repository = @config.repository
+      repository && "nutkins-etcd-#{repository}"
+    end
+
     def get_image_config path
       img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
@@ -210,10 +231,6 @@ module Nutkins
     def get_secrets img_name
       img_dir = get_project_dir img_name
       Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
-    end
-
-    def run_docker *args
-      system 'docker', *args
     end
   end
 end

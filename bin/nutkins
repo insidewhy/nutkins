@@ -42,6 +42,9 @@ module Nutkins::Command
       op.subcommand 'build-secret,B path', 'build secret files/volumes'
       op.subcommand 'extract-secrets,X [*names]', 'extract secret files/volumes'
 
+      op.subcommand 'start-etcd', 'start container running etcd'
+      op.subcommand 'stop-etcd', 'stop container running etcd'
+
       parsed_cfg = op.parse(args).to_h
 
       global_config = OpenStruct.new parsed_cfg[:config]
@@ -75,6 +78,10 @@ module Nutkins::Command
       nutkins.build_secret config.path
     when 'extract-secrets'
       nutkins.extract_secrets config.names
+    when 'start-etcd'
+      nutkins.start_etcd_container
+    when 'stop-etcd'
+      nutkins.stop_etcd_container
     end
   rescue RuntimeError => e
     puts e.to_s
