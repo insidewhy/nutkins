@@ -32,7 +32,7 @@ module Nutkins
       cfg = get_image_config img_name
       img_dir = get_project_dir img_name
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
-      tag = get_tag cfg
+      tag = cfg['tag']
 
       build_cfg = cfg["build"]
       if build_cfg
@@ -43,7 +43,7 @@ module Nutkins
 
       prev_image_id = Docker.image_id_for_tag tag
 
-      if Docker.run "build", "-t", tag, img_dir
+      if Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
         image_id = Docker.image_id_for_tag tag
         if not prev_image_id.nil? and image_id != prev_image_id
           puts "deleting previous image #{prev_image_id}"
@@ -75,7 +75,7 @@ module Nutkins
         end
       end
 
-      tag = get_tag cfg
+      tag = cfg['tag']
       prev_container_id = Docker.container_id_for_tag tag unless preserve
       puts "creating new docker image"
       unless Docker.run "create", "-it", *flags, tag, *docker_args
@@ -95,7 +95,7 @@ module Nutkins
 
     def run img_name, reuse: false, shell: false
       cfg = get_image_config img_name
-      tag = get_tag cfg
+      tag = cfg['tag']
       create_args = []
       if shell
         raise '--shell and --reuse arguments are incompatible' if reuse
@@ -124,10 +124,11 @@ module Nutkins
 
     def delete img_name
       cfg = get_image_config img_name
-      tag = get_tag cfg
+      tag = cfg['tag']
       container_id = Docker.container_id_for_tag tag
       raise "no container to delete" if container_id.nil?
       puts "deleting container #{container_id}"
+      # TODO: also delete :latest
       Docker.run "rm", container_id
     end
 
@@ -183,13 +184,22 @@ module Nutkins
       unless existing
         Docker.run 'create', '--name', name, '-p', '4001:4001', 'microbox/etcd:latest', '-name', name
       end
-      Docker.run 'start', name
+
+      if Docker.run 'start', name
+        puts 'started etcd container'
+      else
+        puts 'failed to start etcd container'
+      end
     end
 
     def stop_etcd_container
       name = get_etcd_container_name
       return unless name
-      Docker.run 'stop', name
+      if Docker.run 'stop', name
+        puts 'stopped etcd container'
+      else
+        puts 'failed to stop etcd container'
+      end
     end
 
     private
@@ -202,6 +212,11 @@ module Nutkins
       img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
       img_cfg["image"] ||= path if path != '.'
+      img_cfg["version"] ||= @config.version if @config.version
+      img_cfg['version'] = img_cfg['version'].to_s
+      raise 'missing mandatory version field' unless img_cfg.has_key? 'version'
+      img_cfg['latest_tag'] = get_tag img_cfg
+      img_cfg['tag'] = img_cfg['latest_tag'] + ':' + img_cfg['version']
       img_cfg
     end
 
