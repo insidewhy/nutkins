@@ -17,7 +17,7 @@ describe Nutkins do
   end
 
   def expect_docker *args
-    expect(@nutkins).to receive(:run_docker).with(*args) { true }
+    expect(Nutkins::Docker).to receive(:run).with(*args) { true }
   end
 
   def make_nutkins project_dir: '.', nutkins_content: nil
