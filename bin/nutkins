@@ -27,6 +27,7 @@ module Nutkins::Command
       op.subcommand 'build,b *names', 'build docker image from dockerfile'
 
       op.subcommand 'create,c *names', 'create container from image' do |subop|
+        subop.on '-r', '--reuse', 'reuse previously built image', 'reuse'
         subop.on '-p', '--preserve', 'preserve existing container', 'preserve'
       end
 
@@ -64,7 +65,7 @@ module Nutkins::Command
       config.names.each &nutkins.method(:build)
     when 'create'
       config.names.each do |name|
-        nutkins.create name, preserve: config.preserve
+        nutkins.create name, preserve: config.preserve, reuse: config.reuse
       end
     when 'delete'
       config.names.each &nutkins.method(:delete)
