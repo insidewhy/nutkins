@@ -190,13 +190,18 @@ module Nutkins
     def start_etcd_container
       name = get_etcd_container_name
       return unless name
+
       existing = Docker.container_id_for_name name
-      unless existing
-        Docker.run 'create', '--name', name, '-p', '4001:4001', 'microbox/etcd:latest', '-name', name
+      if existing
+        Docker.run 'stop', name
+        rm_etcd_docker_container existing
       end
+
+      Docker.run 'create', '--name', name, '-p', '4001:4001', 'microbox/etcd:latest', '-name', name
 
       if Docker.run 'start', name
         puts 'started etcd container'
+        # TODO: copy values from each etcd config section
       else
         puts 'failed to start etcd container'
       end
@@ -205,10 +210,15 @@ module Nutkins
     def stop_etcd_container
       name = get_etcd_container_name
       return unless name
-      if Docker.run 'stop', name
-        puts 'stopped etcd container'
-      else
-        puts 'failed to stop etcd container'
+
+      existing = Docker.container_id_for_name name
+      if existing
+        if Docker.run 'stop', name
+          puts 'stopped etcd container'
+          rm_etcd_docker_container existing
+        else
+          puts 'failed to stop etcd container'
+        end
       end
     end
 
@@ -256,6 +266,11 @@ module Nutkins
     def get_secrets img_name
       img_dir = get_project_dir img_name
       Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
+    end
+
+    private
+    def rm_etcd_docker_container existing
+      raise 'could not delete existing container' unless Docker.run 'rm', existing if existing
     end
   end
 end
