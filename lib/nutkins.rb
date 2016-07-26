@@ -4,6 +4,7 @@ require "net/http"
 require "uri"
 require "fileutils"
 require "json"
+require "net/http"
 
 module Nutkins ; end
 
@@ -16,6 +17,8 @@ module Nutkins
   CONFIG_FILE_NAME = 'nutkins.yaml'
   IMG_CONFIG_FILE_NAME = 'nutkin.yaml'
   VOLUMES_PATH = 'volumes'
+  # TODO: upgrade to container that uses new port, 2379
+  ETCD_PORT = 2379
 
   class CloudManager
     def initialize(project_dir: nil)
@@ -197,11 +200,38 @@ module Nutkins
         rm_etcd_docker_container existing
       end
 
-      Docker.run 'create', '--name', name, '-p', '4001:4001', 'microbox/etcd:latest', '-name', name
+      Docker.run 'create', '--name', name, '-p', "#{ETCD_PORT}:#{ETCD_PORT}",
+                 'quay.io/coreos/etcd',
+                 'etcd', '-name', name,
+                 '-advertise-client-urls', "http://0.0.0.0:#{ETCD_PORT}",
+                 '-listen-client-urls', "http://0.0.0.0:#{ETCD_PORT}"
+
+      img_names = get_all_img_names(img_names)
+      configs = img_names.map &method(:get_image_config)
+      etcd_store = {}
+      configs.each do |config|
+        etcd_store.merge! config['etcd'] if config.has_key? 'etcd'
+      end
 
       if Docker.run 'start', name
         puts 'started etcd container'
-        # TODO: copy values from each etcd config section
+        # even after port is open it still refuses http requests for a while
+        # so just sleep until it is ready... ideally test for working HTTP
+        sleep 1
+
+        etcd_store.each do |key, val|
+          uri = URI("http://127.0.0.1:#{ETCD_PORT}/v2/keys/#{key}")
+          req = Net::HTTP::Put.new(uri)
+          req.body = 'value=' + val
+          res = Net::HTTP.start(uri.hostname, uri.port) do |http|
+            http.request(req)
+          end
+
+          if not res.is_a? Net::HTTPCreated
+            puts "etcd: failed to set #{key} to #{val}"
+            puts res
+          end
+        end
       else
         puts 'failed to start etcd container'
       end
