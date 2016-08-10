@@ -17,7 +17,6 @@ module Nutkins
   CONFIG_FILE_NAME = 'nutkins.yaml'
   IMG_CONFIG_FILE_NAME = 'nutkin.yaml'
   VOLUMES_PATH = 'volumes'
-  # TODO: upgrade to container that uses new port, 2379
   ETCD_PORT = 2379
 
   class CloudManager
@@ -210,7 +209,7 @@ module Nutkins
       configs = img_names.map &method(:get_image_config)
       etcd_store = {}
       configs.each do |config|
-        etcd_store.merge! config['etcd'] if config.has_key? 'etcd'
+        etcd_store.merge! config['etcd']['data'] if config.dig('etcd', 'data')
       end
 
       if Docker.run 'start', name
