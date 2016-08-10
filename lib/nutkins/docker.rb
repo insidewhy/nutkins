@@ -19,7 +19,7 @@ module Nutkins::Docker
 
   def self.run_get_stdout *args
     stdout_str, stderr_str, status = Open3.capture3 'docker', *args
-    status.success? && stdout_str.chomp
+    status.success? ? stdout_str.chomp : nil
   end
 
   def self.run *args, stdout: false, stderr: true

@@ -47,7 +47,7 @@ module Nutkins
 
       if Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
         image_id = Docker.image_id_for_tag tag
-        if not prev_image_id.nil? and image_id != prev_image_id
+        if prev_image_id and image_id != prev_image_id
           puts "deleting previous image #{prev_image_id}"
           Docker.run "rmi", prev_image_id
         end
