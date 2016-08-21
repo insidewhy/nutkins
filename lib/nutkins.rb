@@ -203,10 +203,15 @@ module Nutkins
         rm_etcd_docker_container existing
       end
 
+      gateway = Docker.run_get_stdout 'run', '--rm=true',
+                 'quay.io/coreos/etcd',
+                 'sh', '-c',
+                 "route -n | grep UG | awk '{ print $2 }'"
+
       Docker.run 'create', '--name', name, '-p', "#{ETCD_PORT}:#{ETCD_PORT}",
                  'quay.io/coreos/etcd',
                  'etcd', '-name', name,
-                 '-advertise-client-urls', "http://0.0.0.0:#{ETCD_PORT}",
+                 '-advertise-client-urls', "http://#{gateway}:#{ETCD_PORT}",
                  '-listen-client-urls', "http://0.0.0.0:#{ETCD_PORT}"
 
       img_names = get_all_img_names(img_names)
