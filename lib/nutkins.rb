@@ -79,6 +79,9 @@ module Nutkins
         (create_cfg["env"] or {}).each do |name, val|
           flags.push '-e', "#{name}=#{val}"
         end
+
+        hostname = create_cfg['hostname']
+        flags.push '-h', hostname if hostname
       end
 
       tag = cfg['tag']
