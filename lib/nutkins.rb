@@ -68,8 +68,12 @@ module Nutkins
         img_dir = get_project_dir img_name
         (create_cfg["volumes"] or []).each do |volume|
           src, dest = volume.split ' -> '
-          src = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
-          flags.push '-v', "#{src}:#{dest}"
+          src_dir = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
+          unless Dir.exists? src_dir
+            src_dir = File.absolute_path File.join(@project_root, VOLUMES_PATH, src)
+            raise "could not find source directory for volume #{src}" unless Dir.exists? src_dir
+          end
+          flags.push '-v', "#{src_dir}:#{dest}"
         end
 
         (create_cfg["env"] or {}).each do |name, val|
