@@ -210,6 +210,18 @@ module Nutkins
       etcd_store = {}
       configs.each do |config|
         etcd_store.merge! config['etcd']['data'] if config.dig('etcd', 'data')
+
+        if config.dig('etcd', 'files')
+          config['etcd']['files'].each do |file|
+            etcd_data_path = File.join config['directory'], file
+            begin
+              etcd_store.merge! YAML.load_file(etcd_data_path)
+            rescue => e
+              puts "failed to load etcd data file: #{etcd_data_path}"
+              puts e
+            end
+          end
+        end
       end
 
       if Docker.run 'start', name
@@ -258,9 +270,11 @@ module Nutkins
     end
 
     def get_image_config path
-      img_cfg_path = File.join get_project_dir(path), IMG_CONFIG_FILE_NAME
+      directory =  get_project_dir(path)
+      img_cfg_path = File.join directory, IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
-      img_cfg["image"] ||= path if path != '.'
+      img_cfg['image'] ||= path if path != '.'
+      img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s
       raise 'missing mandatory version field' unless img_cfg.has_key? 'version'
