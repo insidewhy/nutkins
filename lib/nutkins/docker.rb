@@ -5,9 +5,15 @@ module Nutkins::Docker
     self.run_get_stdout 'inspect', '--format="{{.Id}}"', tag
   end
 
-  def self.container_id_for_tag tag
+  def self.kill_and_remove_container id
+    raise "issue killing existing container" unless Nutkins::Docker.run 'kill', id
+    raise "issue removing existing container" unless Nutkins::Docker.run 'rm', id
+  end
+
+  def self.container_id_for_tag tag, running: false
+    flags = running ? '' : ' -a'
     regex = /^[0-9a-f]+ +#{tag} +/
-    `docker ps -a`.each_line do |line|
+    `docker ps#{flags}`.each_line do |line|
       return line.split(' ')[0] if line =~ regex
     end
     nil

@@ -9,6 +9,7 @@ require "net/http"
 module Nutkins ; end
 
 require "nutkins/docker"
+require "nutkins/docker_builder"
 require "nutkins/download"
 require "nutkins/version"
 
@@ -36,6 +37,8 @@ module Nutkins
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
       tag = cfg['tag']
 
+      prev_image_id = Docker.image_id_for_tag tag
+
       build_cfg = cfg["build"]
       if build_cfg
         # download each of the files in the resources section if it doesn't exist
@@ -43,16 +46,22 @@ module Nutkins
         Download.download_resources img_dir, resources if resources
       end
 
-      prev_image_id = Docker.image_id_for_tag tag
-
-      if Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
-        image_id = Docker.image_id_for_tag tag
-        if prev_image_id and image_id != prev_image_id
-          puts "deleting previous image #{prev_image_id}"
-          Docker.run "rmi", prev_image_id
-        end
+      if cfg.dig "build", "commands"
+        # if build commands are available use nutkins built-in builder
+        DockerBuilder::build cfg
       else
-        raise "issue building docker image for #{img_name}"
+        # fallback to `docker build` which is less good
+        if not Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
+          raise "issue building docker image for #{img_name}"
+        end
+      end
+
+      image_id = Docker.image_id_for_tag tag
+      if prev_image_id and image_id != prev_image_id
+        puts "deleting previous image #{prev_image_id}"
+        Docker.run "rmi", prev_image_id
+      else
+        puts "image is identical to cached version"
       end
     end
 
@@ -286,6 +295,7 @@ module Nutkins
       img_cfg_path = File.join directory, IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
       img_cfg['image'] ||= path if path != '.'
+      img_cfg['shell'] ||= 'sh'
       img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s
