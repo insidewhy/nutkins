@@ -55,11 +55,14 @@ module Nutkins::DockerBuilder
           commit_msg = 'add ' + srcs.map do |src|
             src + ':' + Digest::MD5.file(src).to_s
           end.push(dest).join(' ')
+        when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
+          commit_msg = commit_change = build_cmd
         else
+          raise "unsupported command: #{cmd}"
           # TODO add metadata flags
         end
 
-        if docker_args and commit_msg
+        if (commit_change or docker_args) and commit_msg
           commit_msg = "#{parent_img_id} -> #{commit_msg}"
 
           unless cache_is_dirty
@@ -88,16 +91,20 @@ module Nutkins::DockerBuilder
 
           puts "#{cmd}: #{cmd_args}"
 
-          # docker can be an array of one set of args, or an array of arrays of args
-          docker_args = [ docker_args ] unless docker_args[0].kind_of? Array
-          docker_args.each do |one_docker_args|
-            run_args = one_docker_args.map { |arg| arg.gsub '%CONT_ID%', cont_id }
-            puts "run #{run_args.join ' '}"
-            unless Nutkins::Docker.run *run_args, stdout: true
-              raise "build failed: #{one_docker_args.join ' '}"
+          unless docker_args.empty?
+            # docker can be an array of one set of args, or an array of arrays of args
+            docker_args = [ docker_args ] unless docker_args[0].kind_of? Array
+            docker_args.each do |one_docker_args|
+              run_args = one_docker_args.map { |arg| arg.gsub '%CONT_ID%', cont_id }
+              puts "run #{run_args.join ' '}"
+              unless Nutkins::Docker.run *run_args, stdout: true
+                raise "build failed: #{one_docker_args.join ' '}"
+              end
             end
           end
-          parent_img_id = Nutkins::Docker.run_get_stdout 'commit', '-m', commit_msg, cont_id
+
+          commit_args = commit_change ? ['-c', commit_change] : []
+          parent_img_id = Nutkins::Docker.run_get_stdout 'commit', '-m', commit_msg, *commit_args, cont_id
           raise "could not commit docker image" if parent_img_id.nil?
           parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
         else
