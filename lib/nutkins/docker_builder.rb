@@ -34,7 +34,7 @@ module Nutkins::DockerBuilder
       build_commands.each do |build_cmd|
         cmd = /^\w+/.match(build_cmd).to_s.downcase
         cmd_args = build_cmd[(cmd.length + 1)..-1].strip
-
+        commit_changes = []
         docker_args = []
         # the commit_msg is used to look up cache entries, it can be
         # modified if the command uses dynamic data, e.g. to add checksums
@@ -56,13 +56,14 @@ module Nutkins::DockerBuilder
             src + ':' + Digest::MD5.file(src).to_s
           end.push(dest).join(' ')
         when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
-          commit_msg = commit_change = build_cmd
+          commit_msg = build_cmd
+          commit_changes.push build_cmd
         else
           raise "unsupported command: #{cmd}"
           # TODO add metadata flags
         end
 
-        if (commit_change or docker_args) and commit_msg
+        if (not commit_changes.empty? or docker_args) and commit_msg
           commit_msg = "#{parent_img_id} -> #{commit_msg}"
 
           unless cache_is_dirty
@@ -75,15 +76,18 @@ module Nutkins::DockerBuilder
               parent_img_id = cache_img_id
               next
             else
+              if base != parent_img_id
+                puts "TODO: apply final layer of #{parent_img_id} to container created from #{base}"
+                # TODO: extract the final layer of parent_img_id
+                # TODO: apply the contents of the layer's tar file and the whiteouts to the container
+                # TODO: add all previous commit_changes to commit_changes
+              end
+
               puts "starting build container from commit #{parent_img_id}"
               Nutkins::Docker.run 'run', '-d', parent_img_id, 'sleep', '3600'
               cont_id = Nutkins::Docker.container_id_for_tag parent_img_id, running: true
               puts "started build container #{cont_id}"
               cache_is_dirty = true
-
-              if base != parent_img_id
-                puts "TODO: merge final two layers in #{parent_img_id}"
-              end
             end
           end
 
@@ -101,7 +105,7 @@ module Nutkins::DockerBuilder
             end
           end
 
-          commit_args = commit_change ? ['-c', commit_change] : []
+          commit_args = commit_changes.map { |change| ['-c', change] }.flatten
           parent_img_id = Nutkins::Docker.run_get_stdout 'commit', '-m', commit_msg, *commit_args, cont_id
           raise "could not commit docker image" if parent_img_id.nil?
           parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
