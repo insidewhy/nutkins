@@ -68,17 +68,11 @@ module Nutkins::DockerBuilder
           unless cache_is_dirty
             # searches the commit messages of all images for the one matching the expected
             # cache entry for the given content
-            all_images = Nutkins::Docker.run_get_stdout('images', '-aq').split("\n")
-            images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
-            cache_entry = images_meta.find do |image_meta|
-              if image_meta['Comment'] == commit_msg
-                parent_img_id = Nutkins::Docker.get_short_commit(image_meta['Id'])
-                true
-              end
-            end
+            cache_img_id = find_cached_img_id commit_msg
 
-            if cache_entry
+            if cache_img_id
               puts "cached: #{commit_msg}"
+              parent_img_id = cache_img_id
               next
             else
               puts "starting build container from commit #{parent_img_id}"
@@ -86,6 +80,10 @@ module Nutkins::DockerBuilder
               cont_id = Nutkins::Docker.container_id_for_tag parent_img_id, running: true
               puts "started build container #{cont_id}"
               cache_is_dirty = true
+
+              if base != parent_img_id
+                puts "TODO: merge final two layers in #{parent_img_id}"
+              end
             end
           end
 
@@ -113,8 +111,21 @@ module Nutkins::DockerBuilder
       end
     ensure
       Dir.chdir pwd
-      Nutkins::Docker.kill_and_remove_container cont_id if cont_id
-      puts "killed and removed build container"
+      if cont_id
+        Nutkins::Docker.kill_and_remove_container cont_id
+        puts "killed and removed build container"
+      end
     end
+  end
+
+  def self.find_cached_img_id commit_msg
+    all_images = Nutkins::Docker.run_get_stdout('images', '-aq').split("\n")
+    images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
+    images_meta.each do |image_meta|
+      if image_meta['Comment'] == commit_msg
+        return Nutkins::Docker.get_short_commit(image_meta['Id'])
+      end
+    end
+    nil
   end
 end

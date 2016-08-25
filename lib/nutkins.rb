@@ -57,11 +57,17 @@ module Nutkins
       end
 
       image_id = Docker.image_id_for_tag tag
-      if prev_image_id and image_id != prev_image_id
-        puts "deleting previous image #{prev_image_id}"
-        Docker.run "rmi", prev_image_id
+      if prev_image_id
+        if image_id != prev_image_id
+          puts "deleting previous image #{prev_image_id}"
+          Docker.run "rmi", prev_image_id
+        else
+          puts "image is identical to cached version"
+        end
+      elsif image_id
+        puts "created new image #{image_id}"
       else
-        puts "image is identical to cached version"
+        puts "no image exists for image... what went wrong?"
       end
     end
 
