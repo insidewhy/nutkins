@@ -23,7 +23,7 @@ module Nutkins::DockerBuilder
     end
 
     # the base image to start rebuilding from
-    cache_base = base
+    parent_img_id = base
     cont_id = nil
     pwd = Dir.pwd
     begin
@@ -60,6 +60,8 @@ module Nutkins::DockerBuilder
         end
 
         if docker_args and commit_msg
+          commit_msg = "#{parent_img_id} -> #{commit_msg}"
+
           unless cache_is_dirty
             # searches the commit messages of all images for the one matching the expected
             # cache entry for the given content
@@ -67,7 +69,7 @@ module Nutkins::DockerBuilder
             images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
             cache_entry = images_meta.find do |image_meta|
               if image_meta['Comment'] == commit_msg
-                cache_base = image_meta['Id'].sub(/^sha256:/, '')[0...12]
+                parent_img_id = Nutkins::Docker.get_short_commit(image_meta['Id'])
                 true
               end
             end
@@ -76,9 +78,9 @@ module Nutkins::DockerBuilder
               puts "cached: #{commit_msg}"
               next
             else
-              puts "starting build container from commit #{cache_base}"
-              Nutkins::Docker.run 'run', '-d', cache_base, 'sleep', '3600'
-              cont_id = Nutkins::Docker.container_id_for_tag cache_base, running: true
+              puts "starting build container from commit #{parent_img_id}"
+              Nutkins::Docker.run 'run', '-d', parent_img_id, 'sleep', '3600'
+              cont_id = Nutkins::Docker.container_id_for_tag parent_img_id, running: true
               puts "started build container #{cont_id}"
               cache_is_dirty = true
             end
@@ -95,7 +97,9 @@ module Nutkins::DockerBuilder
               raise "build failed: #{one_docker_args.join ' '}"
             end
           end
-          Nutkins::Docker.run 'commit', '-m', commit_msg, cont_id
+          parent_img_id = Nutkins::Docker.run_get_stdout 'commit', '-m', commit_msg, cont_id
+          raise "could not commit docker image" if parent_img_id.nil?
+          parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
         else
           puts "TODO: support cmd #{build_cmd}"
         end

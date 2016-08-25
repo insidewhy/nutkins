@@ -19,6 +19,14 @@ module Nutkins::Docker
     nil
   end
 
+  def self.get_short_commit commit
+    if /^sha256:/.match(commit)
+      commit[7...19]
+    else
+      commit
+    end
+  end
+
   def self.container_id_for_name name
     self.run_get_stdout 'inspect', '--format="{{.Id}}"', name
   end
