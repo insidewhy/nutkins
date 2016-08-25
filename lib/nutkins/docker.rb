@@ -12,7 +12,7 @@ module Nutkins::Docker
 
   def self.container_id_for_tag tag, running: false
     flags = running ? '' : ' -a'
-    regex = /^[0-9a-f]+ +#{tag} +/
+    regex = /^[0-9a-f]+ +#{Regexp.escape tag} +/
     `docker ps#{flags}`.each_line do |line|
       return line.split(' ')[0] if line =~ regex
     end
