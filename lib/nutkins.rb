@@ -301,7 +301,7 @@ module Nutkins
       img_cfg_path = File.join directory, IMG_CONFIG_FILE_NAME
       img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
       img_cfg['image'] ||= path if path != '.'
-      img_cfg['shell'] ||= 'sh'
+      img_cfg['shell'] ||= '/bin/sh'
       img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s

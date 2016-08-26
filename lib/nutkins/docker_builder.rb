@@ -15,16 +15,8 @@ module Nutkins::DockerBuilder
       Docker.run 'pull', base, stdout: true
     end
 
-    cont_id = Nutkins::Docker.container_id_for_tag base, running: true
-    if cont_id
-      puts "found existing container #{cont_id}"
-      Nutkins::Docker.kill_and_remove_container cont_id
-      puts "killed and removed existing container"
-    end
-
     # the base image to start rebuilding from
     parent_img_id = base
-    cont_id = nil
     pwd = Dir.pwd
     begin
       Dir.chdir cfg["directory"]
@@ -34,99 +26,91 @@ module Nutkins::DockerBuilder
       build_commands.each do |build_cmd|
         cmd = /^\w+/.match(build_cmd).to_s.downcase
         cmd_args = build_cmd[(cmd.length + 1)..-1].strip
-        commit_changes = []
-        docker_args = []
-        # the commit_msg is used to look up cache entries, it can be
-        # modified if the command uses dynamic data, e.g. to add checksums
-        commit_msg = nil
+        # docker run is always used and forms the basis of the cache key
+        run_args = nil
+        env_args = nil
+        add_files = nil
+        add_files_dest = nil
 
         case cmd
         when "run"
           cmd_args.gsub! /\n+/, ' '
-          docker_args = ['exec', '%CONT_ID%', cfg['shell'], '-c', cmd_args]
-          commit_msg = cmd + ' ' + cmd_args
+          run_args = cmd_args
         when "add"
-          *srcs, dest = cmd_args.split ' '
-          srcs = srcs.map { |src| Dir.glob src }.flatten
-
-          docker_args = srcs.map { |src| ['cp', src, '%CONT_ID%' + ':' + dest] }
-          # ensure checksum of each file is embedded into commit_msg
+          *add_files, add_files_dest = cmd_args.split ' '
+          add_files = add_files.map { |src| Dir.glob src }.flatten
+          # ensure checksum of each file is embedded into run command
           # if any file changes the cache is dirtied
-          commit_msg = 'add ' + srcs.map do |src|
+          run_args = '#(nop) add ' + add_files.map do |src|
             src + ':' + Digest::MD5.file(src).to_s
-          end.push(dest).join(' ')
+          end.push(add_files_dest).join(' ')
         when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
-          commit_msg = build_cmd
-          commit_changes.push build_cmd
+          run_args = "#(nop) #{build_cmd}"
+          env_args = build_cmd
         else
           raise "unsupported command: #{cmd}"
           # TODO add metadata flags
         end
 
-        if (not commit_changes.empty? or docker_args) and commit_msg
-          commit_msg = "#{parent_img_id} -> #{commit_msg}"
-
+        if run_args
+          run_shell_cmd = [ cfg['shell'], '-c', run_args ]
           unless cache_is_dirty
             # searches the commit messages of all images for the one matching the expected
             # cache entry for the given content
-            cache_img_id = find_cached_img_id commit_msg
+            cache_img_id = find_cached_img_id run_shell_cmd
 
             if cache_img_id
-              puts "cached: #{commit_msg}"
+              puts "cached: #{run_args}"
               parent_img_id = cache_img_id
               next
             else
-              if base != parent_img_id
-                puts "TODO: apply final layer of #{parent_img_id} to container created from #{base}"
-                # TODO: extract the final layer of parent_img_id
-                # TODO: apply the contents of the layer's tar file and the whiteouts to the container
-                # TODO: add all previous commit_changes to commit_changes
-              end
-
-              puts "starting build container from commit #{parent_img_id}"
-              Nutkins::Docker.run 'run', '-d', parent_img_id, 'sleep', '3600'
-              cont_id = Nutkins::Docker.container_id_for_tag parent_img_id, running: true
-              puts "started build container #{cont_id}"
+              puts "not in cache, starting from #{parent_img_id}"
               cache_is_dirty = true
             end
           end
 
-          puts "#{cmd}: #{cmd_args}"
+          if run_args
+            puts "run #{run_args}"
+            unless Nutkins::Docker.run 'run', parent_img_id, *run_shell_cmd, stdout: true
+              raise "run failed: #{run_args}"
+            end
 
-          unless docker_args.empty?
-            # docker can be an array of one set of args, or an array of arrays of args
-            docker_args = [ docker_args ] unless docker_args[0].kind_of? Array
-            docker_args.each do |one_docker_args|
-              run_args = one_docker_args.map { |arg| arg.gsub '%CONT_ID%', cont_id }
-              puts "run #{run_args.join ' '}"
-              unless Nutkins::Docker.run *run_args, stdout: true
-                raise "build failed: #{one_docker_args.join ' '}"
+            cont_id = `docker ps -aq`.lines.first.strip
+            begin
+              if add_files
+                add_files.each do |src|
+                  if not Nutkins::Docker.run 'cp', src, "#{cont_id}:#{add_files_dest}"
+                    raise "could not copy #{src} to #{cont_id}:#{add_files_dest}"
+                  end
+                end
+              end
+
+              commit_args = env_args ? ['-c', env_args] : []
+              parent_img_id = Nutkins::Docker.run_get_stdout 'commit', *commit_args, cont_id
+              raise "could not commit docker image" if parent_img_id.nil?
+              parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
+            ensure
+              if not Nutkins::Docker.run 'rm', cont_id
+                puts "could not remove build container #{cont_id}"
               end
             end
           end
-
-          commit_args = commit_changes.map { |change| ['-c', change] }.flatten
-          parent_img_id = Nutkins::Docker.run_get_stdout 'commit', '-m', commit_msg, *commit_args, cont_id
-          raise "could not commit docker image" if parent_img_id.nil?
-          parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
         else
           puts "TODO: support cmd #{build_cmd}"
         end
       end
     ensure
       Dir.chdir pwd
-      if cont_id
-        Nutkins::Docker.kill_and_remove_container cont_id
-        puts "killed and removed build container"
-      end
     end
+
+    Nutkins::Docker.run 'tag', parent_img_id, cfg['tag']
   end
 
-  def self.find_cached_img_id commit_msg
+  def self.find_cached_img_id command
     all_images = Nutkins::Docker.run_get_stdout('images', '-aq').split("\n")
     images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
     images_meta.each do |image_meta|
-      if image_meta['Comment'] == commit_msg
+      if image_meta.dig('ContainerConfig', 'Cmd') == command
         return Nutkins::Docker.get_short_commit(image_meta['Id'])
       end
     end
