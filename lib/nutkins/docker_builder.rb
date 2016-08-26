@@ -16,7 +16,7 @@ module Nutkins::DockerBuilder
     end
 
     # the base image to start rebuilding from
-    parent_img_id = base
+    parent_img_id = Nutkins::Docker.get_short_commit Nutkins::Docker.container_id_for_name(base)
     pwd = Dir.pwd
     begin
       Dir.chdir cfg["directory"]
@@ -57,7 +57,7 @@ module Nutkins::DockerBuilder
           unless cache_is_dirty
             # searches the commit messages of all images for the one matching the expected
             # cache entry for the given content
-            cache_img_id = find_cached_img_id run_shell_cmd
+            cache_img_id = find_cached_img_id parent_img_id, run_shell_cmd
 
             if cache_img_id
               puts "cached: #{run_args}"
@@ -106,11 +106,12 @@ module Nutkins::DockerBuilder
     Nutkins::Docker.run 'tag', parent_img_id, cfg['tag']
   end
 
-  def self.find_cached_img_id command
+  def self.find_cached_img_id parent_img_id, command
     all_images = Nutkins::Docker.run_get_stdout('images', '-aq').split("\n")
     images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
     images_meta.each do |image_meta|
-      if image_meta.dig('ContainerConfig', 'Cmd') == command
+      if image_meta.dig('ContainerConfig', 'Cmd') == command and
+         Nutkins::Docker.get_short_commit(image_meta['Parent']) == parent_img_id
         return Nutkins::Docker.get_short_commit(image_meta['Id'])
       end
     end
