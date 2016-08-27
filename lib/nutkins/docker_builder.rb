@@ -2,21 +2,23 @@ require_relative "docker"
 require "json"
 require "digest"
 
-module Nutkins::DockerBuilder
+module Nutkins::Docker::Builder
+  Docker = Nutkins::Docker
+
   def self.build cfg
     base = cfg["base"]
     raise "to use build commands you must specify the base image" unless base
 
     # TODO: build cache from this and use to determine restore point
-    # Nutkins::Docker.run 'inspect', tag, stderr: false
+    # Docker.run 'inspect', tag, stderr: false
 
-    unless Nutkins::Docker.run 'inspect', base, stderr: false
+    unless Docker.run 'inspect', base, stderr: false
       puts "getting base image"
       Docker.run 'pull', base, stdout: true
     end
 
     # the base image to start rebuilding from
-    parent_img_id = Nutkins::Docker.get_short_commit Nutkins::Docker.container_id_for_name(base)
+    parent_img_id = Docker.get_short_commit Docker.container_id_for_name(base)
     pwd = Dir.pwd
     begin
       Dir.chdir cfg["directory"]
@@ -80,7 +82,7 @@ module Nutkins::DockerBuilder
 
           if run_args
             puts "run #{run_args}"
-            unless Nutkins::Docker.run 'run', parent_img_id, *run_shell_cmd, stdout: true
+            unless Docker.run 'run', parent_img_id, *run_shell_cmd, stdout: true
               raise "run failed: #{run_args}"
             end
 
@@ -88,18 +90,18 @@ module Nutkins::DockerBuilder
             begin
               if add_files
                 add_files.each do |src|
-                  if not Nutkins::Docker.run 'cp', src, "#{cont_id}:#{add_files_dest}"
+                  if not Docker.run 'cp', src, "#{cont_id}:#{add_files_dest}"
                     raise "could not copy #{src} to #{cont_id}:#{add_files_dest}"
                   end
                 end
               end
 
               commit_args = env_args ? ['-c', env_args] : []
-              parent_img_id = Nutkins::Docker.run_get_stdout 'commit', *commit_args, cont_id
+              parent_img_id = Docker.run_get_stdout 'commit', *commit_args, cont_id
               raise "could not commit docker image" if parent_img_id.nil?
-              parent_img_id = Nutkins::Docker.get_short_commit parent_img_id
+              parent_img_id = Docker.get_short_commit parent_img_id
             ensure
-              if not Nutkins::Docker.run 'rm', cont_id
+              if not Docker.run 'rm', cont_id
                 puts "could not remove build container #{cont_id}"
               end
             end
@@ -112,16 +114,16 @@ module Nutkins::DockerBuilder
       Dir.chdir pwd
     end
 
-    Nutkins::Docker.run 'tag', parent_img_id, cfg['tag']
+    Docker.run 'tag', parent_img_id, cfg['tag']
   end
 
   def self.find_cached_img_id parent_img_id, command
-    all_images = Nutkins::Docker.run_get_stdout('images', '-aq').split("\n")
-    images_meta = JSON.parse(Nutkins::Docker.run_get_stdout('inspect', *all_images))
+    all_images = Docker.run_get_stdout('images', '-aq').split("\n")
+    images_meta = JSON.parse(Docker.run_get_stdout('inspect', *all_images))
     images_meta.each do |image_meta|
       if image_meta.dig('ContainerConfig', 'Cmd') == command and
-         Nutkins::Docker.get_short_commit(image_meta['Parent']) == parent_img_id
-        return Nutkins::Docker.get_short_commit(image_meta['Id'])
+         Docker.get_short_commit(image_meta['Parent']) == parent_img_id
+        return Docker.get_short_commit(image_meta['Id'])
       end
     end
     nil

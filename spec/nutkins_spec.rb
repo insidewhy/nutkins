@@ -49,6 +49,7 @@ describe Nutkins do
     @version = '0.1'
     @tag_no_version = @repo + '/' + @img
     @tag = @tag_no_version + ':' + @version
+    @base = 'busybox:latest'
   end
 
   it 'has a version number' do
@@ -57,7 +58,7 @@ describe Nutkins do
 
   it 'builds a docker image in a subdirectory' do
     make_nutkins nutkins_content: { "repository" => @repo, "version" => @version }
-    expect_image_dir
+    expect_image_dir({ "base" => @base })
     expect_docker 'build', '-t', @tag_no_version, '-t', @tag, @img_dir, stdout: true
     @nutkins.build 'some-image'
   end
@@ -65,7 +66,7 @@ describe Nutkins do
   it 'builds a docker image in the project root' do
     make_nutkins
     @img_dir = @project_dir
-    expect_image_dir({ "repository" => @repo, "image" => @img, "version" => @version })
+    expect_image_dir({ "base" => @base, "repository" => @repo, "image" => @img, "version" => @version })
     expect_docker 'build', '-t', @tag_no_version, '-t', @tag, @img_dir, stdout: true
     @nutkins.build '.'
   end

@@ -24,24 +24,24 @@ module Nutkins::Command
 
       op.on '-p', '--project dir', 'override path to project', 'project_dir'
 
-      op.subcommand 'build,b *names', 'build docker image from dockerfile'
+      op.subcommand 'build,b *paths', 'build docker image[s] from nutkin.yamls/dockerfiles'
 
-      op.subcommand 'create,c *names', 'create container from image' do |subop|
+      op.subcommand 'create,c *paths', 'create container from image' do |subop|
         subop.on '-r', '--reuse', 'reuse previously built image', 'reuse'
         subop.on '-p', '--preserve', 'preserve existing container', 'preserve'
       end
 
-      op.subcommand 'delete,d *names', 'delete container corresponding to image'
+      op.subcommand 'delete,d *paths', 'delete container corresponding to image'
       op.subcommand 'delete-all', 'delete containers corresponding to all images'
 
-      op.subcommand 'run,r name', 'run created container' do |subop|
+      op.subcommand 'run,r path', 'run created container' do |subop|
         subop.on '-r', '--reuse', 'reuse previously created container', 'reuse'
         subop.on '-s', '--shell', 'add bash shell to console', 'shell'
       end
 
-      op.subcommand 'exec,e name *cmd', 'execute a command in a running container'
+      op.subcommand 'exec,e path *cmd', 'execute a command in a running container'
       op.subcommand 'build-secret,B path', 'build secret files/volumes'
-      op.subcommand 'extract-secrets,X [*names]', 'extract secret files/volumes'
+      op.subcommand 'extract-secrets,X [*paths]', 'extract secret files/volumes'
 
       op.subcommand 'start-etcd', 'start container running etcd'
       op.subcommand 'stop-etcd', 'stop container running etcd'
@@ -62,23 +62,23 @@ module Nutkins::Command
 
     case command
     when 'build'
-      config.names.each &nutkins.method(:build)
+      config.paths.each &nutkins.method(:build)
     when 'create'
-      config.names.each do |name|
-        nutkins.create name, preserve: config.preserve, reuse: config.reuse
+      config.paths.each do |path|
+        nutkins.create path, preserve: config.preserve, reuse: config.reuse
       end
     when 'delete'
-      config.names.each &nutkins.method(:delete)
+      config.paths.each &nutkins.method(:delete)
     when 'delete-all'
       nutkins.delete_all
     when 'run'
-      nutkins.run config.name, reuse: config.reuse, shell: config.shell
+      nutkins.run config.path, reuse: config.reuse, shell: config.shell
     when 'exec'
-      nutkins.exec config.name, config.cmd
+      nutkins.exec config.path, config.cmd
     when 'build-secret'
       nutkins.build_secret config.path
     when 'extract-secrets'
-      nutkins.extract_secrets config.names
+      nutkins.extract_secrets config.paths
     when 'start-etcd'
       nutkins.start_etcd_container
     when 'stop-etcd'

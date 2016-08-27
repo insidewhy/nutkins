@@ -13,20 +13,7 @@ require "nutkins/docker_builder"
 require "nutkins/download"
 require "nutkins/version"
 
-unless Hash.new.respond_to? :dig
-  class Hash
-    def dig first_key, *other_keys
-      val = self[first_key]
-      if other_keys.empty?
-        val
-      elsif val and val.kind_of? Hash
-        val.dig *other_keys
-      else
-        nil
-      end
-    end
-  end
-end
+require_relative "hash_dig"
 
 # Must be somedomain.net instead of somedomain.net/, otherwise, it will throw exception.
 module Nutkins
@@ -37,6 +24,9 @@ module Nutkins
 
   class CloudManager
     def initialize(project_dir: nil)
+      @img_configs = {}
+      # when an image is built true is stored against it's name to avoid building it again
+      @built = {}
       @project_root = project_dir || Dir.pwd
       cfg_path = File.join(@project_root, CONFIG_FILE_NAME)
       if File.exists? cfg_path
@@ -46,12 +36,23 @@ module Nutkins
       end
     end
 
-    def build img_name
-      cfg = get_image_config img_name
-      img_dir = get_project_dir img_name
+    def build path
+      cfg = get_image_config path
+      img_dir = cfg['directory']
+      img_name = cfg['image']
+      return if @built[img_name]
+
       raise "directory `#{img_dir}' does not exist" unless Dir.exists? img_dir
       tag = cfg['tag']
 
+      # TODO: flag to suppress building base image?
+      base = cfg['base']
+      unless @built[base]
+        if image_in_project? base
+          puts "building parent of #{img_name}: #{base}"
+          build base
+        end
+      end
       prev_image_id = Docker.image_id_for_tag tag
 
       build_cfg = cfg["build"]
@@ -63,11 +64,11 @@ module Nutkins
 
       if cfg.dig "build", "commands"
         # if build commands are available use nutkins built-in builder
-        DockerBuilder::build cfg
+        Docker::Builder::build cfg
       else
         # fallback to `docker build` which is less good
         if not Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
-          raise "issue building docker image for #{img_name}"
+          raise "issue building docker image for #{path}"
         end
       end
 
@@ -84,18 +85,19 @@ module Nutkins
       else
         puts "no image exists for image... what went wrong?"
       end
+      @built[img_name] = true
     end
 
-    def create img_name, preserve: false, docker_args: [], reuse: false
+    def create path, preserve: false, docker_args: [], reuse: false
       flags = []
-      cfg = get_image_config img_name
+      cfg = get_image_config path
       create_cfg = cfg["create"]
       if create_cfg
         (create_cfg["ports"] or []).each do |port|
           flags.push '-p', "#{port}:#{port}"
         end
 
-        img_dir = get_project_dir img_name
+        img_dir = cfg['directory']
         (create_cfg["volumes"] or []).each do |volume|
           src, dest = volume.split ' -> '
           src_dir = File.absolute_path File.join(img_dir, VOLUMES_PATH, src)
@@ -123,12 +125,12 @@ module Nutkins
           Docker.run "rm", prev_container_id
           prev_container_id = nil
         end
-        build img_name
+        build path
       end
 
       puts "creating new docker image"
       unless Docker.run "create", "-it", *flags, tag, *docker_args
-        raise "failed to create `#{img_name}' container"
+        raise "failed to create `#{path}' container"
       end
 
       unless preserve
@@ -139,16 +141,18 @@ module Nutkins
         end
       end
 
-      puts "created `#{img_name}' container"
+      puts "created `#{path}' container"
     end
 
-    def run img_name, reuse: false, shell: false
-      cfg = get_image_config img_name
+    def run path, reuse: false, shell: false
+      cfg = get_image_config path
       tag = cfg['tag']
       create_args = []
       if shell
         raise '--shell and --reuse arguments are incompatible' if reuse
 
+        # TODO: fix crash when image doesn't exist yet... the tag isn't
+        #       there to be inspected yet
         # TODO: test for smell-baron
         create_args = JSON.parse(`docker inspect #{tag}`)[0]["Config"]["Cmd"]
 
@@ -163,21 +167,20 @@ module Nutkins
 
       id = reuse && Docker.container_id_for_tag(tag)
       unless id
-        create img_name, docker_args: create_args
+        create path, docker_args: create_args
         id = Docker.container_id_for_tag tag
-        raise "couldn't create container to run `#{img_name}'" unless id
+        raise "couldn't create container to run `#{path}'" unless id
       end
 
       Kernel.exec "docker", "start", "-ai", id
     end
 
-    def delete img_name
-      cfg = get_image_config img_name
+    def delete path
+      cfg = get_image_config path
       tag = cfg['tag']
       container_id = Docker.container_id_for_tag tag
       raise "no container to delete" if container_id.nil?
       puts "deleting container #{container_id}"
-      # TODO: also delete :latest
       Docker.run "rm", container_id
     end
 
@@ -201,13 +204,15 @@ module Nutkins
       File.unlink secret if path_is_dir
     end
 
-    def extract_secrets img_names
-      if img_names.empty?
-        img_names = get_all_img_names(img_names).push '.'
+    def extract_secrets img_dirs
+      if img_dirs.empty?
+        img_dirs = get_all_img_dirs
+        # there may be secrets in the root even if there is no image build there
+        img_dirs.push '.' unless img_dirs.include? '.'
       end
 
-      img_names.each do |img_name|
-        get_secrets(img_name).each do |secret|
+      img_dirs.each do |img_dir|
+        get_secrets(img_dir).each do |secret|
           loop do
             puts "enter passphrase for #{secret}"
             break if system 'gpg', secret
@@ -222,10 +227,11 @@ module Nutkins
       end
     end
 
-    def exec img_name, *cmd
-      puts "TODO: exec #{img_name}: #{cmd.join ' '}"
+    def exec path, *cmd
+      puts "TODO: exec #{path}: #{cmd.join ' '}"
     end
 
+    # TODO: move this stuff into another file
     def start_etcd_container
       name = get_etcd_container_name
       return unless name
@@ -247,14 +253,15 @@ module Nutkins
                  '-advertise-client-urls', "http://#{gateway}:#{ETCD_PORT}",
                  '-listen-client-urls', "http://0.0.0.0:#{ETCD_PORT}"
 
-      img_names = get_all_img_names(img_names)
-      configs = img_names.map &method(:get_image_config)
+      img_dirs = get_all_img_dirs
+      configs = img_dirs.map &method(:get_image_config)
       etcd_store = {}
       configs.each do |config|
         etcd_store.merge! config['etcd']['data'] if config.dig('etcd', 'data')
 
-        if config.dig('etcd', 'files')
-          config['etcd']['files'].each do |file|
+        etcd_files = config.dig('etcd', 'files')
+        if etcd_files
+          etcd_files.each do |file|
             etcd_data_path = File.join config['directory'], file
             begin
               etcd_store.merge! YAML.load_file(etcd_data_path)
@@ -311,19 +318,30 @@ module Nutkins
       repository && "nutkins-etcd-#{repository}"
     end
 
+    # path should be "." or a single element path referencing the project root
     def get_image_config path
+      cached = @img_configs[path]
+      return cached if cached
+
       directory =  get_project_dir(path)
       img_cfg_path = File.join directory, IMG_CONFIG_FILE_NAME
-      img_cfg = File.exists?(img_cfg_path) ? YAML.load_file(img_cfg_path) : {}
+      raise "missing #{img_cfg_path}" unless File.exists?(img_cfg_path)
+      img_cfg = YAML.load_file(img_cfg_path)
       img_cfg['image'] ||= path if path != '.'
+      raise "#{img_cfg_path} must contain 'image' entry" unless img_cfg['image']
+
       img_cfg['shell'] ||= '/bin/sh'
+      img_cfg['path'] ||= img_cfg_path
       img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s
-      raise 'missing mandatory version field' unless img_cfg.has_key? 'version'
+      raise "#{img_cfg_path} must contain 'version' entry" unless img_cfg.has_key? 'version'
       img_cfg['latest_tag'] = get_tag img_cfg
       img_cfg['tag'] = img_cfg['latest_tag'] + ':' + img_cfg['version']
-      img_cfg
+
+      base = img_cfg['base']
+      raise "#{img_cfg_path} must include `base` field" unless  base
+      @img_configs[path] = img_cfg
     end
 
     def get_project_dir path
@@ -331,10 +349,6 @@ module Nutkins
     end
 
     def get_tag img_cfg
-      unless img_cfg.has_key? "image"
-        raise "nutkins.yaml should contain `image' entry for this command"
-      end
-
       repository = img_cfg['repository'] || @config.repository
       if repository.nil?
         raise "nutkins.yaml or nutkin.yaml should contain `repository' entry for this command"
@@ -342,15 +356,19 @@ module Nutkins
       repository + '/' + img_cfg['image']
     end
 
-    def get_all_img_names img_names
-      Dir.glob("#{@project_root}/*/Dockerfile").map do |path|
+    def get_all_img_dirs
+      Dir.glob("#{@project_root}{,/*}/nutkin.yaml").map do |path|
         File.basename File.dirname(path)
       end
     end
 
-    # can supply img_name or . for project root
-    def get_secrets img_name
-      img_dir = get_project_dir img_name
+    def image_in_project? image_name
+      get_all_img_dirs.map(&method(:get_image_config)).find do |cfg|
+        cfg['image'] == image_name
+      end
+    end
+
+    def get_secrets img_dir
       Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
     end
 
