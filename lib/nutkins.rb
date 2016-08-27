@@ -69,7 +69,8 @@ module Nutkins
 
       if cfg.dig "build", "commands"
         # if build commands are available use nutkins built-in builder
-        Docker::Builder::build cfg
+        base_cfg ||= config_for_image base
+        Docker::Builder::build cfg, base_cfg && base_cfg['tag']
       else
         # fallback to `docker build` which is less good
         if not Docker.run 'build', '-t', cfg['latest_tag'], '-t', tag, img_dir, stdout: true
@@ -83,7 +84,7 @@ module Nutkins
           puts "deleting previous image #{prev_image_id}"
           Docker.run "rmi", prev_image_id
         else
-          puts "image is identical to cached version"
+          puts "unchanged image: #{tag}"
         end
       elsif image_id
         puts "created new image #{image_id}"
@@ -344,8 +345,9 @@ module Nutkins
       img_cfg['latest_tag'] = get_tag img_cfg
       img_cfg['tag'] = img_cfg['latest_tag'] + ':' + img_cfg['version']
 
+      # base isn't the full tag name in the case of local references!!
       base = img_cfg['base']
-      raise "#{img_cfg_path} must include `base' field" unless  base
+      raise "#{img_cfg_path} must include `base' field" unless base
       @img_configs[path] = img_cfg
     end
 

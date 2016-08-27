@@ -5,16 +5,15 @@ require "digest"
 module Nutkins::Docker::Builder
   Docker = Nutkins::Docker
 
-  def self.build cfg
-    base = cfg["base"]
+  def self.build cfg, base_tag = nil
+    base = base_tag || cfg["base"]
     raise "to use build commands you must specify the base image" unless base
 
     # TODO: build cache from this and use to determine restore point
     # Docker.run 'inspect', tag, stderr: false
-
     unless Docker.run 'inspect', base, stderr: false
       puts "getting base image"
-      Docker.run 'pull', base, stdout: true
+      raise "could not find base image #{base}" unless Docker.run 'pull', base, stdout: true
     end
 
     # the base image to start rebuilding from
@@ -53,7 +52,16 @@ module Nutkins::Docker::Builder
           # ensure checksum of each file is embedded into run command
           # if any file changes the cache is dirtied
           run_args = '#(nop) add ' + add_files.map do |src|
-            src + ':' + Digest::MD5.file(src).to_s
+            if File.directory? src
+              md5 = Digest::MD5.new
+              Dir.glob("#{src}/**/*").each do |file|
+                md5.update(File.read file)
+              end
+              hash = md5.hexdigest
+            else
+              hash = Digest::MD5.file(src).to_s
+            end
+            src + ':' + hash
           end.push(add_files_dest).join(' ')
         when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
           env_args = cmd + ' ' + (cmd_args.kind_of?(String) ? cmd_args : JSON.dump(cmd_args))
