@@ -328,19 +328,19 @@ module Nutkins
       raise "missing #{img_cfg_path}" unless File.exists?(img_cfg_path)
       img_cfg = YAML.load_file(img_cfg_path)
       img_cfg['image'] ||= path if path != '.'
-      raise "#{img_cfg_path} must contain 'image' entry" unless img_cfg['image']
+      raise "#{img_cfg_path} must contain `image' entry" unless img_cfg['image']
 
       img_cfg['shell'] ||= '/bin/sh'
       img_cfg['path'] ||= img_cfg_path
       img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s
-      raise "#{img_cfg_path} must contain 'version' entry" unless img_cfg.has_key? 'version'
+      raise "#{img_cfg_path} must contain `version' entry" unless img_cfg.has_key? 'version'
       img_cfg['latest_tag'] = get_tag img_cfg
       img_cfg['tag'] = img_cfg['latest_tag'] + ':' + img_cfg['version']
 
       base = img_cfg['base']
-      raise "#{img_cfg_path} must include `base` field" unless  base
+      raise "#{img_cfg_path} must include `base' field" unless  base
       @img_configs[path] = img_cfg
     end
 
