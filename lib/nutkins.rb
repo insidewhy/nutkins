@@ -15,6 +15,9 @@ require "nutkins/version"
 
 require_relative "hash_dig"
 
+# throughout this file "path" is a directory, it should be "." or a single path like "directory"
+# which should correspond to a directory within the project root containing a nutkin.yaml
+
 # Must be somedomain.net instead of somedomain.net/, otherwise, it will throw exception.
 module Nutkins
   CONFIG_FILE_NAME = 'nutkins.yaml'
@@ -48,9 +51,11 @@ module Nutkins
       # TODO: flag to suppress building base image?
       base = cfg['base']
       unless @built[base]
-        if image_in_project? base
+        base_cfg = config_for_image base
+        if base_cfg
+          base_path = base_cfg['path']
           puts "building parent of #{img_name}: #{base}"
-          build base
+          build base_path
         end
       end
       prev_image_id = Docker.image_id_for_tag tag
@@ -204,15 +209,15 @@ module Nutkins
       File.unlink secret if path_is_dir
     end
 
-    def extract_secrets img_dirs
-      if img_dirs.empty?
-        img_dirs = get_all_img_dirs
+    def extract_secrets paths
+      if paths.empty?
+        paths = get_all_img_paths
         # there may be secrets in the root even if there is no image build there
-        img_dirs.push '.' unless img_dirs.include? '.'
+        paths.push '.' unless paths.include? '.'
       end
 
-      img_dirs.each do |img_dir|
-        get_secrets(img_dir).each do |secret|
+      paths.each do |path|
+        get_secrets(path).each do |secret|
           loop do
             puts "enter passphrase for #{secret}"
             break if system 'gpg', secret
@@ -253,8 +258,8 @@ module Nutkins
                  '-advertise-client-urls', "http://#{gateway}:#{ETCD_PORT}",
                  '-listen-client-urls', "http://0.0.0.0:#{ETCD_PORT}"
 
-      img_dirs = get_all_img_dirs
-      configs = img_dirs.map &method(:get_image_config)
+      all_paths = get_all_img_paths
+      configs = all_paths.map &method(:get_image_config)
       etcd_store = {}
       configs.each do |config|
         etcd_store.merge! config['etcd']['data'] if config.dig('etcd', 'data')
@@ -328,10 +333,10 @@ module Nutkins
       raise "missing #{img_cfg_path}" unless File.exists?(img_cfg_path)
       img_cfg = YAML.load_file(img_cfg_path)
       img_cfg['image'] ||= path if path != '.'
+      img_cfg['path'] = path
       raise "#{img_cfg_path} must contain `image' entry" unless img_cfg['image']
 
       img_cfg['shell'] ||= '/bin/sh'
-      img_cfg['path'] ||= img_cfg_path
       img_cfg['directory'] = directory
       img_cfg["version"] ||= @config.version if @config.version
       img_cfg['version'] = img_cfg['version'].to_s
@@ -356,20 +361,20 @@ module Nutkins
       repository + '/' + img_cfg['image']
     end
 
-    def get_all_img_dirs
+    def get_all_img_paths
       Dir.glob("#{@project_root}{,/*}/nutkin.yaml").map do |path|
         File.basename File.dirname(path)
       end
     end
 
-    def image_in_project? image_name
-      get_all_img_dirs.map(&method(:get_image_config)).find do |cfg|
+    def config_for_image image_name
+      get_all_img_paths.map(&method(:get_image_config)).find do |cfg|
         cfg['image'] == image_name
       end
     end
 
-    def get_secrets img_dir
-      Dir.glob("#{img_dir}/{volumes,secrets}/*.gpg")
+    def get_secrets path
+      Dir.glob("#{path}/{volumes,secrets}/*.gpg")
     end
 
     private
