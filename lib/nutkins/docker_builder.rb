@@ -54,9 +54,17 @@ module Nutkins::Docker::Builder
           run_args = '#(nop) add ' + add_files.map do |src|
             if File.directory? src
               md5 = Digest::MD5.new
-              Dir.glob("#{src}/**/*").each do |file|
-                md5.update(File.read file)
+              update_md5_dir = Proc.new do |dir|
+                Dir.glob("#{dir}/*").each do |dir_entry|
+                  if File.directory? dir_entry
+                    update_md5_dir.call dir_entry
+                  else
+                    md5.update(File.read dir_entry)
+                  end
+                end
               end
+
+              update_md5_dir.call src
               hash = md5.hexdigest
             else
               hash = Digest::MD5.file(src).to_s
