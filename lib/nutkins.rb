@@ -317,7 +317,7 @@ module Nutkins
       end
     end
 
-    private
+  private
     def get_etcd_container_name
       repository = @config.repository
       repository && "nutkins-etcd-#{repository}"
@@ -377,7 +377,6 @@ module Nutkins
       Dir.glob("#{path}/{volumes,secrets}/*.gpg")
     end
 
-    private
     def rm_etcd_docker_container existing
       raise 'could not delete existing container' unless Docker.run 'rm', existing if existing
     end
