@@ -24,8 +24,14 @@ module Nutkins::DockerBuilder
       cache_is_dirty = false
       build_commands = cfg["build"]["commands"]
       build_commands.each do |build_cmd|
-        cmd = /^\w+/.match(build_cmd).to_s.downcase
-        cmd_args = build_cmd[(cmd.length + 1)..-1].strip
+        unless build_cmd.kind_of? Hash or build_cmd.keys.length != 1
+          raise "build command should be single value hash e.g. 'run:bash'"
+        end
+
+        # build command as object, e.g. run: bash
+        cmd = build_cmd.keys.first.downcase
+        cmd_args = build_cmd[cmd]
+
         # docker run is always used and forms the basis of the cache key
         run_args = nil
         env_args = nil
@@ -34,8 +40,11 @@ module Nutkins::DockerBuilder
 
         case cmd
         when "run"
-          cmd_args.gsub! /\n+/, ' '
-          run_args = cmd_args
+          if cmd_args.kind_of? String
+            run_args = cmd_args.gsub /\n+/, ' '
+          else
+            run_args = cmd_args.join ' && '
+          end
         when "add"
           *add_files, add_files_dest = cmd_args.split ' '
           add_files = add_files.map { |src| Dir.glob src }.flatten
@@ -45,8 +54,8 @@ module Nutkins::DockerBuilder
             src + ':' + Digest::MD5.file(src).to_s
           end.push(add_files_dest).join(' ')
         when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
-          run_args = "#(nop) #{build_cmd}"
-          env_args = build_cmd
+          env_args = cmd + ' ' + (cmd_args.kind_of?(String) ? cmd_args : JSON.dump(cmd_args))
+          run_args = "#(nop) #{env_args}"
         else
           raise "unsupported command: #{cmd}"
           # TODO add metadata flags
@@ -64,7 +73,7 @@ module Nutkins::DockerBuilder
               parent_img_id = cache_img_id
               next
             else
-              puts "not in cache, starting from #{parent_img_id}"
+              puts "not in cache: #{run_args} - starting from #{parent_img_id}"
               cache_is_dirty = true
             end
           end
