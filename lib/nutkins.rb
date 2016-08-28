@@ -246,6 +246,8 @@ module Nutkins
       name = get_etcd_container_name
       return unless name
 
+      # TODO: update existing etcd server rather than creating new container...
+      #       this will let confd instances respond to updates
       existing = Docker.container_id_for_name name
       if existing
         Docker.run 'stop', name
@@ -324,10 +326,7 @@ module Nutkins
     end
 
   private
-    def get_etcd_container_name
-      repository = @config.repository
-      repository && "nutkins-etcd-#{repository}"
-    end
+    def get_etcd_container_name; "nutkins-etcd"; end
 
     # path should be "." or a single element path referencing the project root
     def get_image_config path
