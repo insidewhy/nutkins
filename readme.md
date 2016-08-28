@@ -9,14 +9,14 @@ nutkins provides a way to build and test clusters based on one or more container
    * Caches each command in a layer and rebuilds from cache in a fraction of a second.
  * Test services that use multiple containers without having to use VMs.
  * Support for etcd/environment variables and confd.
-  * nutkins will run a local etcd server for your tests.
-  * nutkins will build confd configuration files for you using a sensible convention-over-configuration approach.
+  * nutkins can manage a local etcd server and its data to test confd configurations.
+  * nutkins can manage a confd configuration using a sensible convention-over-configuration approach.
  * Manages secrets encrypted with gpg.
 
 nutkins works great with:
- * [smell-baron](https://github.com/ohjames/smell-baron) - an init system for docker containers
  * [etcd](https://github.com/coreos/etcd) - a distributed key-value data store.
  * [confd](https://github.com/kelseyhightower/confd) - a system for building configuration files from data stored using `etcd` (and other data stores).
+ * [smell-baron](https://github.com/ohjames/smell-baron) - an init system for docker containers
 
 ## installation
 
@@ -131,7 +131,7 @@ create:
 
 ### Testing images configured with etcd
 
-The following `nutkin.yaml` shows how to share data via `etcd`:
+The following `nutkin.yaml` shows how to manage a local `etcd` cluster:
 
 ```yaml
 base: base
