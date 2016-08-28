@@ -123,7 +123,6 @@ module Nutkins::Docker::Builder
               unless copies.empty?
                 copies.each do |copy|
                   copy[:srcs].each do |src|
-                    puts "copy #{src} -> #{cont_id}:#{copy[:dest]}"
                     if not Docker.run 'cp', src, "#{cont_id}:#{copy[:dest]}"
                       raise "could not copy #{src} to #{cont_id}:#{copy[:dest]}"
                     end
