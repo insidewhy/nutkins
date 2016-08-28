@@ -72,7 +72,7 @@ build:
 
 The `resources` section downloads files to local directories so that they can be used in the image. In the case of `confd` it also extracts a file from a `tar.gz` compressed archive.
 
-The `commands` section is like a `Dockerfile` and is used to build a container. In this case it runs multiple commands, add the files it downloaded to the base image and sets an `entrypoint` on the image. This image would be tagged `myorg/base:0.0.1`. The image name comes from the subdirectory by default but can be overriden along with the `version`:
+The `commands` section is like a `Dockerfile` and is used to build a container. In this case it runs multiple commands, add some files to the image and sets an `entrypoint`. This image would be tagged `myorg/base:0.0.1`. The image name comes from the subdirectory but can be overriden along with the `version`:
 
 ```yaml
 base: ubuntu:16.04
@@ -99,7 +99,7 @@ nutkins run -s base
 
 ### Image project dependencies
 
-When a `nutkin.yaml` refers to a `base` image that exists in the current project then it ensures the base image is up to date before any images are built that extend it.
+When a `nutkin.yaml` file refers to a `base` image that exists in the current project then `nutkins` ensures the base image is up to date before any images are built that use or extend it.
 
 ### Sharing local data with images
 
@@ -158,6 +158,7 @@ When running any container in the project `nutkins` will first start up a contai
 
 ```bash
 etcd2_host=$(ip route | grep '^default' | cut -d' ' -f3)
+# use confd to build the configuration files from the data stored in etcd
 confd -onetime -backend etcd -node http://$etcd_host:2379
 ```
 
