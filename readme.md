@@ -5,6 +5,7 @@
 nutkins provides a way to build and test clusters based on one or more containers.
  * A easier and more flexible way to build docker images than `Dockerfile`.
    * Can run multiple commands to build a layer with comments for each.
+   * Can run multiple `copy` commands in the same layer.
    * No need for `.dockerignore`.
    * Caches each command in a layer and rebuilds from cache in a fraction of a second.
  * Test services that use multiple containers without having to use VMs.
