@@ -2,8 +2,8 @@
 
 [![build status](https://circleci.com/gh/ohjames/nutkins.png)](https://circleci.com/gh/ohjames/nutkins)
 
-nutkins provides a way to build and test clusters based on one or more docker containers.
- * A more powerful and easier way to build docker images than `Dockerfile`.
+nutkins provides a way to build and test clusters based on one or more containers.
+ * A easier and more flexible way to build docker images than `Dockerfile`.
    * Can run multiple commands to build a layer with comments for each.
    * No need for `.dockerignore`.
    * Caches each command in a layer and rebuilds from cache in a fraction of a second.
