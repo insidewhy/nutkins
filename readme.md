@@ -158,7 +158,7 @@ etcd:
     ejabberd/muc_host: c.@HOST@
 ```
 
-When running any container in the project `nutkins` will first start up a container running `etcd` and store the etcd data from every `nutkin.yaml` in it. To access this `etcd` data from within the container:
+When running a container that has etcd data `nutkins` will first start up a helper container running `etcd` and use it to serve the etcd data from every `nutkin.yaml` in the project. To access this `etcd` data from within the container:
 
 ```bash
 etcd2_host=$(ip route | grep '^default' | cut -d' ' -f3)

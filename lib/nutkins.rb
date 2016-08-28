@@ -30,6 +30,7 @@ module Nutkins
       @img_configs = {}
       # when an image is built true is stored against it's name to avoid building it again
       @built = {}
+      @etcd_running = false
       @project_root = project_dir || Dir.pwd
       cfg_path = File.join(@project_root, CONFIG_FILE_NAME)
       if File.exists? cfg_path
@@ -153,6 +154,8 @@ module Nutkins
     def run path, reuse: false, shell: false
       cfg = get_image_config path
       tag = cfg['tag']
+
+      start_etcd_container if cfg['etcd']
       create_args = []
       if shell
         raise '--shell and --reuse arguments are incompatible' if reuse
@@ -237,8 +240,9 @@ module Nutkins
       puts "TODO: exec #{path}: #{cmd.join ' '}"
     end
 
-    # TODO: move this stuff into another file
     def start_etcd_container
+      return if @etcd_running
+      # TODO: move this stuff into another file
       name = get_etcd_container_name
       return unless name
 
@@ -298,6 +302,7 @@ module Nutkins
             puts res
           end
         end
+        @etcd_running = true
       else
         puts 'failed to start etcd container'
       end
