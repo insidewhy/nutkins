@@ -36,8 +36,7 @@ module Nutkins::Docker::Builder
         # docker run is always used and forms the basis of the cache key
         run_args = nil
         env_args = nil
-        add_files = nil
-        add_files_dest = nil
+        copies = []
 
         case cmd
         when "run"
@@ -46,31 +45,48 @@ module Nutkins::Docker::Builder
           else
             run_args = cmd_args.join ' && '
           end
-        when "add"
-          *add_files, add_files_dest = cmd_args.split ' '
-          add_files = add_files.map { |src| Dir.glob src }.flatten
-          # ensure checksum of each file is embedded into run command
-          # if any file changes the cache is dirtied
-          run_args = '#(nop) add ' + add_files.map do |src|
-            if File.directory? src
-              md5 = Digest::MD5.new
-              update_md5_dir = Proc.new do |dir|
-                Dir.glob("#{dir}/*").each do |dir_entry|
-                  if File.directory? dir_entry
-                    update_md5_dir.call dir_entry
-                  else
-                    md5.update(File.read dir_entry)
+        when "copy"
+          if cmd_args.kind_of? String
+            all_copy_args = [ cmd_args ]
+          else
+            all_copy_args = cmd_args
+          end
+
+          copies = all_copy_args.map do |copy_args|
+            *add_files, add_files_dest = copy_args.split ' '
+            add_files = add_files.map { |src| Dir.glob src }.flatten
+            # ensure checksum of each file is embedded into run command
+            # if any file changes the cache is dirtied
+
+            if not run_args
+              run_args = '#(nop) copy '
+            else
+              run_args += ';'
+            end
+
+            run_args += add_files.map do |src|
+              if File.directory? src
+                md5 = Digest::MD5.new
+                update_md5_dir = Proc.new do |dir|
+                  Dir.glob("#{dir}/*").each do |dir_entry|
+                    if File.directory? dir_entry
+                      update_md5_dir.call dir_entry
+                    else
+                      md5.update(File.read dir_entry)
+                    end
                   end
                 end
-              end
 
-              update_md5_dir.call src
-              hash = md5.hexdigest
-            else
-              hash = Digest::MD5.file(src).to_s
-            end
-            src + ':' + hash
-          end.push(add_files_dest).join(' ')
+                update_md5_dir.call src
+                hash = md5.hexdigest
+              else
+                hash = Digest::MD5.file(src).to_s
+              end
+              src + ':' + hash
+            end.push(add_files_dest).join(' ')
+
+            { srcs: add_files, dest: add_files_dest }
+          end
         when "cmd", "entrypoint", "env", "expose", "label", "onbuild", "user", "volume", "workdir"
           env_args = cmd + ' ' + (cmd_args.kind_of?(String) ? cmd_args : JSON.dump(cmd_args))
           run_args = "#(nop) #{env_args}"
@@ -104,10 +120,13 @@ module Nutkins::Docker::Builder
 
             cont_id = `docker ps -aq`.lines.first.strip
             begin
-              if add_files
-                add_files.each do |src|
-                  if not Docker.run 'cp', src, "#{cont_id}:#{add_files_dest}"
-                    raise "could not copy #{src} to #{cont_id}:#{add_files_dest}"
+              unless copies.empty?
+                copies.each do |copy|
+                  copy[:srcs].each do |src|
+                    puts "copy #{src} -> #{cont_id}:#{copy[:dest]}"
+                    if not Docker.run 'cp', src, "#{cont_id}:#{copy[:dest]}"
+                      raise "could not copy #{src} to #{cont_id}:#{copy[:dest]}"
+                    end
                   end
                 end
               end

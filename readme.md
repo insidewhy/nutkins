@@ -66,13 +66,13 @@ build:
       - apt-get update
       - apt-get install -y vim zsh less nano rsync git net-tools
       - groupadd -g 5496 sslcerts
-    - add: bin/* /bin/
+    - copy: bin/* /bin/
     - entrypoint: ["/bin/smell-baron"]
 ```
 
 The `resources` section downloads files to local directories so that they can be used in the image. In the case of `confd` it also extracts a file from a `tar.gz` compressed archive.
 
-The `commands` section is like a `Dockerfile` and is used to build a container. In this case it runs multiple commands, add some files to the image and sets an `entrypoint`. This image would be tagged `myorg/base:0.0.1`. The image name comes from the subdirectory but can be overriden along with the `version`:
+The `commands` section is like a `Dockerfile` and is used to build a container. In this case it runs multiple commands, copies some files to the image and sets an `entrypoint`. This image would be tagged `myorg/base:0.0.1`. The image name comes from the subdirectory but can be overriden along with the `version`:
 
 ```yaml
 base: ubuntu:16.04
@@ -92,7 +92,7 @@ This will output various information as it builds the image. If the same command
 ```bash
 % nutkins build base
 cached: apt-get update && apt-get install -y vim zsh less nano rsync git net-tools && groupadd -g 5496 sslcerts
-cached: #(nop) add bin/confd:33472f6b8f9522ec7bdb01a8feeb03fb bin/etcdctl:8edfaac7c726e8231c6e0e8f75ffb678 bin/smell-baron:909345dcbc4a029d42f39278486a32b9 /bin/
+cached: #(nop) copy bin/confd:33472f6b8f9522ec7bdb01a8feeb03fb bin/etcdctl:8edfaac7c726e8231c6e0e8f75ffb678 bin/smell-baron:909345dcbc4a029d42f39278486a32b9 /bin/
 cached: #(nop) entrypoint ["/bin/smell-baron"]
 unchanged image: myorg/base:0.0.1
 ```
