@@ -41,7 +41,7 @@ For projects that consist of a single `nutkin.yaml` in the project root then `nu
 
 ### Images
 
-Each subdirectory in the project root that contains a file `nutkin.yaml` is used to build a docker image. The following project contains an image in a subdirectory `base` that extends the ubuntu:16.04 container hosted on docker hub:
+Each subdirectory in the project root that contains a file `nutkin.yaml` is used to build a docker image. The following project contains an image in a subdirectory `base` that extends the `ubuntu:16.04` container hosted on docker hub:
 
 ```yaml
 base: ubuntu:16.04
@@ -83,17 +83,27 @@ build:
 ```
 
 To build this image:
-```
+```bash
 nutkins build base
 ```
 
-To run a container from this image (this also rebuilds the image which is very fast due to `nutkins` cache usage):
+This will output various information as it builds the image. If the same command is run again it will reuse data from the cache, exiting in less than a second:
+
+```bash
+% nutkins build base
+cached: apt-get update && apt-get install -y vim zsh less nano rsync git net-tools && groupadd -g 5496 sslcerts
+cached: #(nop) add bin/confd:33472f6b8f9522ec7bdb01a8feeb03fb bin/etcdctl:8edfaac7c726e8231c6e0e8f75ffb678 bin/smell-baron:909345dcbc4a029d42f39278486a32b9 /bin/
+cached: #(nop) entrypoint ["/bin/smell-baron"]
+unchanged image: myorg/base:0.0.1
 ```
+
+To run a container from this image (this first rebuilds the image):
+```bash
 nutkins run base
 ```
 
 To run a container from this image and open an interactive shell (this only works if the `entrypoint` is [smell-baron](https://github.com/ohjames/smell-baron)):
-```
+```bash
 nutkins run -s base
 ```
 
