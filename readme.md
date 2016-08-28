@@ -41,7 +41,7 @@ For projects that consist of a single `nutkin.yaml` in the project root then `nu
 
 ### Images
 
-Each subdirectory in the project root that contains a file `nutkin.yaml` is used to build a docker image. The following project contains an image in a subdirectory `base` that extends an ubuntu 16.04 base image:
+Each subdirectory in the project root that contains a file `nutkin.yaml` is used to build a docker image. The following project contains an image in a subdirectory `base` that extends the ubuntu:16.04 container hosted on docker hub:
 
 ```yaml
 base: ubuntu:16.04
@@ -103,7 +103,7 @@ When a `nutkin.yaml` file refers to a `base` image that exists in the current pr
 
 ### Sharing local data with images
 
-When using `nutkins run` to test images it can be useful to share data in the host system with the running containers. This can be seen in the following `nutkin.yaml`:
+When using `nutkins` to test images it can be useful to share data in the host system with the running containers:
 
 ```yaml
 base: base
@@ -118,13 +118,7 @@ create:
     - ejabberd-var -> /var/lib/ejabberd
 ```
 
-If the previous `nutkin.yaml` was in the `jabber` subdirectory then building it will also share data volumes stored in the project with any containers created via `nutkins run jabber`. For the entry:
-
-```
- - ssl -> /etc/ssl
-```
-
-The volume `ssl` will be searched for first in `jabber/volumes/ssl` and then `volumes/ssl`.
+If `nutkins.yaml` is in the directory `subdir` the volume `ssl` will be searched for first in `subdir/volumes/ssl` and then `volumes/ssl`.
 
 ### Sharing ports with the host operating system
 
