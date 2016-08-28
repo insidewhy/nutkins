@@ -8,8 +8,8 @@ nutkins provides a way to build and test clusters based on one or more container
    * No need for `.dockerignore`.
    * Caches each command in a layer and rebuilds from cache in a fraction of a second.
  * Test services that use multiple containers without having to use VMs.
- * Support for etcd2/environment variables and confd.
-  * nutkins will run a local etcd2 server for your tests.
+ * Support for etcd/environment variables and confd.
+  * nutkins will run a local etcd server for your tests.
   * nutkins will build confd configuration files for you using a sensible convention-over-configuration approach.
  * Manages secrets encrypted with gpg.
 
@@ -135,9 +135,9 @@ create:
     - 5269
 ```
 
-### Testing images configured with etcd2
+### Testing images configured with etcd
 
-The following `nutkin.yaml` shows how to share data via `etcd2`:
+The following `nutkin.yaml` shows how to share data via `etcd`:
 
 ```yaml
 base: base
@@ -154,11 +154,11 @@ etcd:
     ejabberd/muc_host: c.@HOST@
 ```
 
-When running any container in the project `nutkins` will first start up a container running `etcd2` and add the data from every `nutkin.yaml` to it. To access this `etcd2` data from within the container:
+When running any container in the project `nutkins` will first start up a container running `etcd` and store the etcd data from every `nutkin.yaml` in it. To access this `etcd` data from within the container:
 
 ```bash
 etcd2_host=$(ip route | grep '^default' | cut -d' ' -f3)
 confd -onetime -backend etcd -node http://$etcd_host:2379
 ```
 
-The same command will work within a CoreOS cluster or any other etcd2 backed cluster.
+The same command will work within a CoreOS cluster or any other etcd backed cluster.
